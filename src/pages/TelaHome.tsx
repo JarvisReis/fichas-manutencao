@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { AlertTriangle, ChevronRight, Clock, CloudOff, Database, HardDriveDownload, Menu, Moon, Search, Sun, Users, Wifi, X } from 'lucide-react'
+import { AlertTriangle, ChevronRight, CloudOff, Database, HardDriveDownload, Menu, Moon, Search, Sun, Users, Wifi, X } from 'lucide-react'
 import { db } from '../lib/db'
 import { GRUPOS, grupoDaFicha } from '../config/fichas'
 import { lerEquipamentos, lerPessoas, normalizar, type Equipamento, type Pessoa } from '../lib/cadastros'
@@ -402,7 +402,7 @@ export default function TelaHome({
               Nenhum contator encontrado para "{busca}".
             </p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 px-1">
               {filtrados.map((equip) => {
                 const ultima = ultimaPorEquipamento.get(equip.nome)
                 const quandoDaUltima = ultima
@@ -473,7 +473,7 @@ export default function TelaHome({
             <p className="mb-2 px-1 text-xs text-slate-500">
               Os três que passaram mais tempo sem serviço — vale dar prioridade.
             </p>
-            <div className="space-y-2">
+            <div className="space-y-2 px-1">
               {maisAntigos.map((exec) => {
                 const nome = (exec.camposFixos.equipamento ?? '').trim()
                 const equip = equipamentos.find((e) => e.nome.trim() === nome)
@@ -490,19 +490,31 @@ export default function TelaHome({
                     }
                     className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 text-left"
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
-                      <Clock size={18} />
-                    </span>
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-red-500" />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium text-slate-900">
+                      <span className="block truncate text-sm font-semibold text-slate-900">
                         {nome || exec.codigo}
                       </span>
-                      <span className="block text-xs text-slate-600">
-                        última: {quando.toLocaleDateString('pt-BR')} ·{' '}
-                        {meses === 0 ? 'menos de 1 mês' : `${meses} ${meses === 1 ? 'mês' : 'meses'}`}
+                      <span className="block truncate text-xs text-slate-500">
+                        {equip
+                          ? [equip.local, equip.serie].filter(Boolean).join(' · ') || 'sem detalhes'
+                          : exec.local || 'sem detalhes'}
+                      </span>
+                      <span className="mt-1.5 flex flex-wrap items-center gap-1">
+                        <span className="rounded bg-red-100 px-1.5 py-0.5 text-[9px] font-bold text-red-800">
+                          PRIORIDADE
+                        </span>
+                        <span className="text-[11px] text-slate-600">
+                          última: {quando.toLocaleDateString('pt-BR')}
+                        </span>
+                        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-600">
+                          {meses === 0
+                            ? 'MENOS DE 1 MÊS'
+                            : `${meses} ${meses === 1 ? 'MÊS' : 'MESES'}`}
+                        </span>
                       </span>
                     </span>
-                    <ChevronRight size={18} className="shrink-0 text-amber-600" />
+                    <ChevronRight size={18} className="shrink-0 text-slate-400" />
                   </button>
                 )
               })}
