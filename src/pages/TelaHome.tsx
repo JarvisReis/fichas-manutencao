@@ -417,8 +417,7 @@ export default function TelaHome({
                         {equip.nome}
                       </span>
                       <span className="block truncate text-xs text-slate-500">
-                        {[equip.local, equip.marca, equip.serie].filter(Boolean).join(' · ') ||
-                          'sem detalhes'}
+                        {[equip.local, equip.serie].filter(Boolean).join(' · ') || 'sem detalhes'}
                       </span>
                       <span className="mt-1.5 flex flex-wrap items-center gap-1">
                         <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">
@@ -527,8 +526,7 @@ export default function TelaHome({
                       </span>
                       <span className="block truncate text-xs text-slate-500">
                         {equip
-                          ? [equip.local, equip.marca, equip.serie].filter(Boolean).join(' · ') ||
-                            'sem detalhes'
+                          ? [equip.local, equip.serie].filter(Boolean).join(' · ') || 'sem detalhes'
                           : exec.local || 'sem detalhes'}
                       </span>
                       <span className="mt-1.5 flex flex-wrap items-center gap-1">
