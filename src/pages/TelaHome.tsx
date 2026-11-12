@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { AlertTriangle, Check, ChevronRight, Clock, CloudOff, LogOut, NotebookPen, Database, HardDriveDownload, Menu, Moon, Search, ShieldCheck, Sun, User as UserIcon, Users, Wifi, X } from 'lucide-react'
+import { AlertTriangle, Check, ChevronRight, Clock, CloudOff, LogIn, LogOut, NotebookPen, Database, HardDriveDownload, Menu, Moon, Search, ShieldCheck, Sun, User as UserIcon, Users, Wifi, X } from 'lucide-react'
 import { db } from '../lib/db'
 import { GRUPOS, grupoDaFicha } from '../config/fichas'
 import { lerEquipamentos, lerPessoas, normalizar, type Equipamento, type Pessoa } from '../lib/cadastros'
@@ -9,6 +9,7 @@ import type { Execucao } from '../types'
 
 interface Props {
   sessao: Sessao | null
+  onEntrar: () => void
   onSair: () => void
   ehAdministrador: boolean
   /** Abre a execução já com a ficha definida pelo cadastro do contator. */
@@ -27,6 +28,7 @@ const CHAVE_GRUPO = 'fichas:grupo'
 
 export default function TelaHome({
   sessao,
+  onEntrar,
   onSair,
   ehAdministrador,
   onNovaExecucaoDoEquipamento,
@@ -253,7 +255,7 @@ export default function TelaHome({
               <span className="truncate">{sessao.nome}</span>
             </span>
           )}
-          {sessao && (
+          {sessao ? (
             <button
               onClick={onSair}
               className="rounded-full bg-white/15 p-1.5 text-white active:bg-white/25"
@@ -261,6 +263,15 @@ export default function TelaHome({
               title="Sair"
             >
               <LogOut size={15} />
+            </button>
+          ) : (
+            <button
+              onClick={onEntrar}
+              className="rounded-full bg-white/15 p-1.5 text-white active:bg-white/25"
+              aria-label="Identificar-se"
+              title="Identificar-se"
+            >
+              <LogIn size={15} />
             </button>
           )}
           </div>

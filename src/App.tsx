@@ -5,6 +5,7 @@ import { getFicha } from './config/fichas'
 import { lerEquipamentos, lerPessoas, type Equipamento } from './lib/cadastros'
 import { podeEditarExecucao } from './lib/permissoes'
 import { useSessao } from './lib/sessao'
+import SeletorSessao from './components/SeletorSessao'
 import TelaHome from './pages/TelaHome'
 import TelaIdentificacao from './pages/TelaIdentificacao'
 import TelaExecucao from './pages/TelaExecucao'
@@ -59,10 +60,11 @@ export default function App() {
   }, [])
   const [online, setOnline] = useState(navigator.onLine)
   const { tema, alternar } = useTema()
-  const { sessao, sair, ehAdministrador } = useSessao()
+  const { sessao, entrar, sair, ehAdministrador } = useSessao()
 
   // Quantas pessoas existem no cadastro. Com zero, o administrador ainda não
   // existe e o app precisa abrir a tela de cadastros — senão nasce trancado.
+  const [identificando, setIdentificando] = useState(false)
   const [totalPessoas, setTotalPessoas] = useState<number | null>(null)
   useEffect(() => {
     const contar = () => void lerPessoas().then((l) => setTotalPessoas(l.length))
@@ -278,6 +280,7 @@ export default function App() {
             temaEscuro={tema === 'escuro'}
             sessao={sessao}
             ehAdministrador={ehAdministrador}
+            onEntrar={() => setIdentificando(true)}
             onSair={sair}
             onNovaExecucaoDoEquipamento={(equip) => void abrirUltimaManutencao(equip)}
             onAbrirExecucao={(id) => void abrirExecucao(id)}
@@ -373,9 +376,32 @@ export default function App() {
 
     default:
       return (
-        <TelaHome
+        <>
+          {identificando && !sessao && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+              <div className="w-full max-w-sm space-y-2 rounded-2xl bg-white p-4 shadow-2xl">
+                <SeletorSessao
+                  sessao={sessao}
+                  ehAdministrador={ehAdministrador}
+                  onEntrar={(nova) => {
+                    entrar(nova)
+                    setIdentificando(false)
+                  }}
+                  onSair={() => setIdentificando(false)}
+                />
+                <button
+                  onClick={() => setIdentificando(false)}
+                  className="w-full rounded-lg border border-slate-300 bg-white py-2 text-xs font-semibold text-slate-600"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+          <TelaHome
           online={online}
           sessao={sessao}
+          onEntrar={() => setIdentificando(true)}
           onSair={sair}
           ehAdministrador={ehAdministrador}
           onNovaExecucaoDoEquipamento={(equip) => void abrirUltimaManutencao(equip)}
@@ -385,7 +411,8 @@ export default function App() {
           onVerCadastros={() => setRota({ nome: 'cadastros' })}
           onAlternarTema={alternar}
           temaEscuro={tema === 'escuro'}
-        />
+          />
+        </>
       )
   }
 }
