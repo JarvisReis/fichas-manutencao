@@ -1,0 +1,85 @@
+{
+  "formato": "fichas-backup",
+  "versao": 1,
+  "exportadoEm": "2026-11-12T12:40:00.000Z",
+  "aparelho": "cadastro",
+  "execucoes": [],
+  "fotos": [],
+  "cadastros": {
+    "equipamentos": [
+      {
+        "id": "0f7e179d-453e-4c2c-a6a6-9f37d1e25d4f",
+        "nome": "ANR-CT01",
+        "fichaId": "CT-BI",
+        "local": "ANR",
+        "serie": "HPB001"
+      },
+      {
+        "id": "35ace1b8-2963-46d7-a478-e7b740988d60",
+        "nome": "ANR-CT02",
+        "fichaId": "CT-BI",
+        "local": "",
+        "serie": ""
+      },
+      {
+        "id": "f6c25f3f-48d4-435e-85c9-7fbdebda6a82",
+        "nome": "PSO-CT01",
+        "fichaId": "CT-FICHA",
+        "local": "PSO OESTE",
+        "serie": ""
+      },
+      {
+        "id": "dc4b2858-3fb7-4aec-aeb0-7017356b477f",
+        "nome": "PSO-CT02",
+        "fichaId": "CT-BI",
+        "local": "PSO",
+        "serie": "HPB001"
+      },
+      {
+        "id": "f7e73902-d3fb-4f1b-9040-882c90e2ef55",
+        "nome": "PSO-SC71",
+        "fichaId": "SC-BI1",
+        "local": "PSO",
+        "serie": ""
+      },
+      {
+        "id": "5b2efef0-e785-45c1-a453-708afc3e4498",
+        "nome": "PSO-SC72",
+        "fichaId": "SC-BI1",
+        "local": "PSO",
+        "serie": ""
+      },
+      {
+        "id": "9c16716b-daf3-43f3-ac8c-fd83e4af4dd1",
+        "nome": "VMD-CT01",
+        "fichaId": "CT-BI",
+        "local": "VMD",
+        "serie": ""
+      },
+      {
+        "id": "6ab36d8e-d2e1-4f40-afbd-bbe394a7efc4",
+        "nome": "VMD-CT02",
+        "fichaId": "CT-BI",
+        "local": "VMD",
+        "serie": ""
+      },
+      {
+        "id": "8816a2fb-2ca0-4f31-b3e1-985658304ec9",
+        "nome": "NÚCLEO HPB001",
+        "fichaId": "CT-BI",
+        "local": "ANR",
+        "marca": "",
+        "serie": "HPB001"
+      }
+    ],
+    "pessoas": [
+      {
+        "id": "ab6c9cc1-a6e6-4ad1-b75d-b3229294db9d",
+        "nome": "Ricardo Reis",
+        "rg": "221221",
+        "nivel": "administrador",
+        "ativo": true
+      }
+    ]
+  }
+}

@@ -269,6 +269,35 @@ export async function importarBackup(texto: string): Promise<{
     }
   }
 
+  // Backups antigos não traziam cadastros. O nome do equipamento, porém, está
+  // dentro de cada ficha — dá para reconstruir o cadastro básico com o que a
+  // própria execução registrou, em vez de o técnico digitar tudo de novo.
+  let equipamentosDasFichas = 0
+  {
+    const atuais = await lerEquipamentos()
+    const porNome = new Map(atuais.map((e) => [e.nome.trim().toLowerCase(), true]))
+    const criados: Equipamento[] = []
+    for (const exec of pacote.execucoes) {
+      const nome = (exec.camposFixos?.equipamento ?? '').trim()
+      if (!nome) continue
+      const chave = nome.toLowerCase()
+      if (porNome.has(chave)) continue
+      porNome.set(chave, true)
+      criados.push({
+        id: crypto.randomUUID(),
+        nome,
+        fichaId: exec.fichaId,
+        local: (exec.local ?? '').trim(),
+        marca: exec.marca,
+        serie: exec.camposFixos?.serieInstalado,
+      })
+    }
+    if (criados.length > 0) {
+      await gravarEquipamentos([...atuais, ...criados])
+      equipamentosDasFichas = criados.length
+    }
+  }
+
   let importadas = 0
   let ignoradas = 0
 
@@ -321,7 +350,7 @@ export async function importarBackup(texto: string): Promise<{
     execucoes: importadas,
     fotos: fotosImportadas,
     ignoradas,
-    equipamentos: equipamentosImportados,
+    equipamentos: equipamentosImportados + equipamentosDasFichas,
     pessoas: pessoasImportadas,
   }
 }
