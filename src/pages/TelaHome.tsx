@@ -480,15 +480,6 @@ export default function TelaHome({
         </section>
         )}
 
-        {!sessao && (
-          <section>
-            <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-              Sem identificação você está no modo consulta. Toque em entrar no cabeçalho para
-              executar manutenções.
-            </p>
-          </section>
-        )}
-
         {sessao && caixa === 'prioridade' && maisAntigos.length === 0 && (
           <section>
             <p className="rounded-xl bg-slate-100 p-3 text-xs text-slate-600">
