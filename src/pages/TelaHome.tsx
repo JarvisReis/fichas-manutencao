@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { AlertTriangle, ChevronRight, Clock, CloudOff, Database, HardDriveDownload, Menu, Moon, Search, Sun, Users, Wifi, X } from 'lucide-react'
+import { AlertTriangle, Check, ChevronRight, Clock, CloudOff, NotebookPen, Database, HardDriveDownload, Menu, Moon, Search, Sun, Users, Wifi, X } from 'lucide-react'
 import { db } from '../lib/db'
 import { GRUPOS, grupoDaFicha } from '../config/fichas'
 import { lerEquipamentos, lerPessoas, normalizar, type Equipamento, type Pessoa } from '../lib/cadastros'
@@ -418,7 +418,9 @@ export default function TelaHome({
                     onClick={() => onNovaExecucaoDoEquipamento(equip)}
                     className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 text-left"
                   >
-                    <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500" />
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+                      <Check size={18} />
+                    </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-slate-900">
                         {equip.nome}
@@ -542,7 +544,9 @@ export default function TelaHome({
                     onClick={() => onAbrirExecucao(exec.id)}
                     className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 text-left"
                   >
-                    <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-500" />
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                      <NotebookPen size={18} />
+                    </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-slate-900">
                         {nome || exec.codigo}
