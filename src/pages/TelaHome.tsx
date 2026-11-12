@@ -298,6 +298,26 @@ export default function TelaHome({
             )}
           </div>
 
+          <div className="mb-2 grid grid-cols-3 gap-1.5">
+            {(
+              [
+                { id: 'rascunho', rotulo: 'Rascunho', cor: 'bg-amber-600' },
+                { id: 'recente', rotulo: 'Mais recente', cor: 'bg-blue-700' },
+                { id: 'prioridade', rotulo: 'Prioridade', cor: 'bg-red-700' },
+              ] as const
+            ).map((c) => (
+              <button
+                key={c.id}
+                onClick={() => setCaixa(c.id)}
+                className={`rounded-xl px-2 py-2 text-[11px] font-semibold leading-tight transition ${
+                  caixa === c.id ? `${c.cor} text-white` : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {c.rotulo}
+              </button>
+            ))}
+          </div>
+
           {equipamentos.filter((e) => grupoDaFicha(e.fichaId) === grupo).length === 0 ? (
             <div className="rounded-2xl border-2 border-dashed border-slate-300 p-4">
               <p className="text-xs text-slate-600">
@@ -357,28 +377,6 @@ export default function TelaHome({
             </div>
           )}
         </section>
-
-        <div className="grid grid-cols-3 gap-1.5">
-          {(
-            [
-              { id: 'rascunho', rotulo: 'Rascunho', cor: 'bg-amber-600' },
-              { id: 'recente', rotulo: 'Mais recente', cor: 'bg-blue-700' },
-              { id: 'prioridade', rotulo: 'Prioridade', cor: 'bg-red-700' },
-            ] as const
-          ).map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setCaixa(c.id)}
-              className={`rounded-xl px-2 py-2 text-[11px] font-semibold leading-tight transition ${
-                caixa === c.id
-                  ? `${c.cor} text-white`
-                  : 'bg-slate-100 text-slate-600'
-              }`}
-            >
-              {c.rotulo}
-            </button>
-          ))}
-        </div>
 
         {caixa === 'prioridade' && maisAntigos.length > 0 && (
           <section>
