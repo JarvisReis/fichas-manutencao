@@ -23,8 +23,40 @@ type Rota =
   | { nome: 'ficha'; ficha: DefinicaoFicha; execucao: Execucao; equipamento: Equipamento | null }
   | { nome: 'salvo'; execucao: Execucao; equipamento: Equipamento | null }
 
+/**
+ * Grava a tela na URL (#/historico), para recarregar ou reabrir o app na mesma
+ * tela. Só telas que não dependem de dados carregados entram na URL — ficha
+ * aberta por id exigiria reabrir a execução, e isso fica para depois.
+ */
+const ROTAS_NA_URL = new Set(['historico', 'backup', 'cadastros'])
+
+function rotaDaUrl(): Rota {
+  const alvo = window.location.hash.replace(/^#\/?/, '').split('?')[0]
+  return ROTAS_NA_URL.has(alvo) ? ({ nome: alvo } as Rota) : { nome: 'home' }
+}
+
 export default function App() {
-  const [rota, setRota] = useState<Rota>({ nome: 'home' })
+  const [rota, setRotaState] = useState<Rota>(rotaDaUrl)
+
+  /** Troca de tela mantendo a URL em sincronia com o que está aberto. */
+  const setRota: typeof setRotaState = (valor) => {
+    setRotaState((atual) => {
+      const proxima = typeof valor === 'function' ? valor(atual) : valor
+      const hash = ROTAS_NA_URL.has(proxima.nome) ? `#/${proxima.nome}` : ''
+      if (window.location.hash !== hash) {
+        const url = `${window.location.pathname}${window.location.search}${hash}`
+        window.history.replaceState(null, '', url)
+      }
+      return proxima
+    })
+  }
+
+  // Botão voltar do navegador/aparelho: a URL manda na tela.
+  useEffect(() => {
+    const aoMudarHash = () => setRotaState(rotaDaUrl())
+    window.addEventListener('hashchange', aoMudarHash)
+    return () => window.removeEventListener('hashchange', aoMudarHash)
+  }, [])
   const [online, setOnline] = useState(navigator.onLine)
   const { tema, alternar } = useTema()
   const { sessao, entrar, sair, ehAdministrador } = useSessao()
