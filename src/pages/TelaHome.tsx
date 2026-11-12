@@ -160,6 +160,17 @@ export default function TelaHome({
     return [...mapa.values()].slice(0, 3)
   }, [todas, grupo])
 
+  // Equipamentos com alguma execução ainda não enviada: o cartão avisa como no
+  // Rascunho, em vez de esconder que o serviço está só no aparelho.
+  const naoEnviadas = useMemo(() => {
+    const nomes = new Set<string>()
+    for (const exec of pendentes ?? []) {
+      const nome = (exec.camposFixos.equipamento ?? '').trim()
+      if (nome) nomes.add(nome)
+    }
+    return nomes
+  }, [pendentes])
+
   const [busca, setBusca] = useState('')
   const [equipamentos, setEquipamentos] = useState<Equipamento[]>([])
   const [pessoas, setPessoas] = useState<Pessoa[]>([])
@@ -398,8 +409,9 @@ export default function TelaHome({
                   <button
                     key={equip.id}
                     onClick={() => onNovaExecucaoDoEquipamento(equip)}
-                    className="flex w-full items-center gap-3 rounded-2xl border-2 border-slate-200 bg-white p-3.5 text-left shadow-sm active:scale-[0.995] active:bg-slate-50"
+                    className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 text-left"
                   >
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500" />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-slate-900">
                         {equip.nome}
@@ -413,6 +425,11 @@ export default function TelaHome({
                           {ficha ? ficha.nomeCurto.toUpperCase() : 'FICHA NÃO DEFINIDA'}
                         </span>
                         <UltimaManutencao exec={ultimaPorEquipamento.get(equip.nome)} />
+                        {naoEnviadas.has(equip.nome.trim()) && (
+                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-500">
+                            NÃO ENVIADO
+                          </span>
+                        )}
                       </span>
                     </span>
                     <ChevronRight size={18} className="shrink-0 text-slate-400" />
