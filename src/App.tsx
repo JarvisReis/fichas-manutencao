@@ -59,7 +59,7 @@ export default function App() {
   }, [])
   const [online, setOnline] = useState(navigator.onLine)
   const { tema, alternar } = useTema()
-  const { sessao, entrar, sair, ehAdministrador } = useSessao()
+  const { sessao, sair, ehAdministrador } = useSessao()
 
   // Quantas pessoas existem no cadastro. Com zero, o administrador ainda não
   // existe e o app precisa abrir a tela de cadastros — senão nasce trancado.
@@ -278,7 +278,6 @@ export default function App() {
             temaEscuro={tema === 'escuro'}
             sessao={sessao}
             ehAdministrador={ehAdministrador}
-            onEntrar={entrar}
             onSair={sair}
             onNovaExecucaoDoEquipamento={(equip) => void abrirUltimaManutencao(equip)}
             onAbrirExecucao={(id) => void abrirExecucao(id)}
@@ -377,7 +376,6 @@ export default function App() {
         <TelaHome
           online={online}
           sessao={sessao}
-          onEntrar={entrar}
           onSair={sair}
           ehAdministrador={ehAdministrador}
           onNovaExecucaoDoEquipamento={(equip) => void abrirUltimaManutencao(equip)}
