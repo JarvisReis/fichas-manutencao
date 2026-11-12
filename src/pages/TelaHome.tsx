@@ -331,8 +331,7 @@ export default function TelaHome({
         {!sessao && (
           <section>
             <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-              Sem identificação você está no modo consulta. Toque em entrar no cabeçalho para
-              executar manutenções.
+              Identifique-se para executar manutenções. Toque no ícone de entrar no cabeçalho.
             </p>
           </section>
         )}
