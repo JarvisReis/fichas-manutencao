@@ -24,6 +24,9 @@ interface Props {
   online: boolean
 }
 
+/** Aba escolhida na home, lembrada entre visitas. */
+const CHAVE_GRUPO = 'fichas:grupo'
+
 export default function TelaHome({
   sessao,
   onEntrar,
@@ -69,7 +72,26 @@ export default function TelaHome({
     return mapa
   }, [todas])
 
-  const [grupo, setGrupo] = useState(GRUPOS[0].id)
+  // A aba escolhida sobrevive ao recarregar e a voltar de uma ficha concluída:
+  // quem está na seccionadora não quer cair em contator toda vez.
+  const [grupo, setGrupoState] = useState<string>(() => {
+    try {
+      const salvo = localStorage.getItem(CHAVE_GRUPO)
+      if (salvo && GRUPOS.some((g) => g.id === salvo)) return salvo
+    } catch {
+      // localStorage bloqueado (modo privado): cai no primeiro grupo
+    }
+    return GRUPOS[0].id
+  })
+
+  const setGrupo = (id: string) => {
+    setGrupoState(id)
+    try {
+      localStorage.setItem(CHAVE_GRUPO, id)
+    } catch {
+      // sem persistência, a aba vale só nesta sessão
+    }
+  }
   const [busca, setBusca] = useState('')
   const [equipamentos, setEquipamentos] = useState<Equipamento[]>([])
 
