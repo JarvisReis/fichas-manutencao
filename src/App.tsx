@@ -160,13 +160,28 @@ export default function App() {
     } as Equipamento
   }
 
+  /** Equipamento mínimo a partir da própria execução, quando nada mais resolve. */
+  const equipamentoAvulso = (execucao: Execucao): Equipamento => {
+    const ficha = getFicha(execucao.fichaId)
+    const nome = (execucao.camposFixos.equipamento ?? '').trim() || 'Equipamento sem nome'
+    return {
+      id: `avulso:${nome}`,
+      nome,
+      local: execucao.local ?? '',
+      fichaId: ficha?.id ?? execucao.fichaId,
+    } as Equipamento
+  }
+
   const salvarExecucao = async (id: string, status: Execucao['status']) => {
     const execucao = await db.execucoes.get(id)
     if (!execucao) return
     const atualizada: Execucao = { ...execucao, status, atualizadaEm: new Date().toISOString() }
     await db.execucoes.put(atualizada)
     if (status !== 'rascunho') {
-      const equipamento = await equipamentoDaExecucao(atualizada)
+      // Equipamento sempre resolvido: mesmo digitado à mão vira um "avulso", para
+      // a tela de sucesso conseguir oferecer a próxima manutenção.
+      const equipamento =
+        (await equipamentoDaExecucao(atualizada)) ?? equipamentoAvulso(atualizada)
       setRota({ nome: 'salvo', execucao: atualizada, equipamento })
     } else {
       setRota({ nome: 'home' })
