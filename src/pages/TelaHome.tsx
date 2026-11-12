@@ -59,21 +59,23 @@ export default function TelaHome({
 
   const naoSincronizadas = pendentes?.length ?? 0
 
-  /** Última execução de cada equipamento, para o cartão mostrar a manutenção feita. */
+  /**
+   * As três últimas manutenções de cada equipamento, da mais recente para a mais
+   * antiga. É só leitura de apoio: o técnico vê o histórico recente antes de
+   * abrir um serviço novo. Rascunho não entra — rascunho é a seção "Continuar".
+   */
   const todas = useLiveQuery(() => db.execucoes.toArray(), [], [])
-  const ultimaPorEquipamento = useMemo(() => {
-    const mapa = new Map<string, { exec: (typeof todas)[number]; total: number }>()
+  const ultimasPorEquipamento = useMemo(() => {
+    const mapa = new Map<string, (typeof todas)[number][]>()
     const ordenadas = [...(todas ?? [])]
       .filter((e) => e.status !== 'rascunho')
       .sort((a, b) => Date.parse(b.dataHora) - Date.parse(a.dataHora))
     for (const exec of ordenadas) {
       const nome = exec.camposFixos.equipamento?.trim()
       if (!nome) continue
-      const atual = mapa.get(nome)
-      // Rascunho não entra: o cartão mostra a última manutenção encerrada, e a
-      // contagem é o total de manutenções fechadas daquele equipamento.
-      if (atual) mapa.set(nome, { exec: atual.exec, total: atual.total + 1 })
-      else mapa.set(nome, { exec, total: 1 })
+      const lista = mapa.get(nome) ?? []
+      if (lista.length < 3) lista.push(exec)
+      mapa.set(nome, lista)
     }
     return mapa
   }, [todas])
@@ -249,10 +251,7 @@ export default function TelaHome({
                       <span className="mt-0.5 block text-[11px] font-medium text-blue-700">
                         {ficha ? ficha.nomeCurto : 'ficha não definida'}
                       </span>
-                      <UltimaManutencao
-                        exec={ultimaPorEquipamento.get(equip.nome)?.exec}
-                        total={ultimaPorEquipamento.get(equip.nome)?.total ?? 0}
-                      />
+                      <UltimasManutencoes execs={ultimasPorEquipamento.get(equip.nome) ?? []} />
                     </span>
                     <ChevronRight size={18} className="shrink-0 text-slate-400" />
                   </button>
@@ -362,44 +361,44 @@ export default function TelaHome({
 }
 
 /**
- * Última manutenção daquele equipamento. Mostra quando foi, que tipo (P1/P2) e
- * se está concluída — é o que o técnico olha antes de abrir um serviço novo.
+ * Até três últimas manutenções do equipamento. Mostra quando foi, o tipo (P1/P2)
+ * e o desfecho — é o que o técnico olha antes de abrir um serviço novo. Sem
+ * nenhuma manutenção encerrada, o cartão diz isso em vez de ficar vazio.
  */
-function UltimaManutencao({ exec, total }: { exec: Execucao | undefined; total: number }) {
-  if (!exec) {
+function UltimasManutencoes({ execs }: { execs: Execucao[] }) {
+  if (execs.length === 0) {
     return (
       <span className="mt-1.5 flex items-center gap-1 text-[11px] text-slate-500">
         <Clock size={11} /> sem manutenção registrada
       </span>
     )
   }
-  const quando = new Date(exec.dataHora).toLocaleString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: '2-digit',
-  })
-  const tipo = exec.tipoManutencao ?? '—'
-  const aberta = exec.status !== 'concluida'
   return (
-    <span className="mt-1.5 flex flex-wrap items-center gap-1">
-      <span className="rounded bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white">{tipo}</span>
-      <span className="text-[11px] text-slate-600">{quando}</span>
-      <span
-        className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${
-          exec.status === 'pendente'
-            ? 'bg-red-600 text-white'
-            : aberta
-              ? 'bg-amber-100 text-amber-800'
-              : 'bg-emerald-100 text-emerald-800'
-        }`}
-      >
-        {exec.status === 'pendente' ? 'PENDENTE' : aberta ? 'RASCUNHO' : 'CONCLUÍDA'}
-      </span>
-      {total > 1 && (
-        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-600">
-          {total} MANUT.
-        </span>
-      )}
+    <span className="mt-1.5 block space-y-0.5">
+      {execs.map((exec) => {
+        const quando = new Date(exec.dataHora).toLocaleString('pt-BR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: '2-digit',
+        })
+        return (
+          <span key={exec.id} className="flex flex-wrap items-center gap-1">
+            <span className="rounded bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white">
+              {exec.tipoManutencao ?? '—'}
+            </span>
+            <span className="text-[11px] text-slate-600">{quando}</span>
+            <span
+              className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${
+                exec.status === 'pendente'
+                  ? 'bg-red-600 text-white'
+                  : 'bg-emerald-100 text-emerald-800'
+              }`}
+            >
+              {exec.status === 'pendente' ? 'PENDENTE' : 'CONCLUÍDA'}
+            </span>
+          </span>
+        )
+      })}
     </span>
   )
 }
