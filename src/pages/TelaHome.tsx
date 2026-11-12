@@ -293,14 +293,16 @@ export default function TelaHome({
                   onVerHistorico()
                 }}
               />
-              <MenuItem
-                icone={<HardDriveDownload size={18} />}
-                rotulo="Backup das execuções"
-                onClick={() => {
-                  setMenuAberto(false)
-                  onVerBackup()
-                }}
-              />
+              {ehAdministrador && (
+                <MenuItem
+                  icone={<HardDriveDownload size={18} />}
+                  rotulo="Backup das execuções"
+                  onClick={() => {
+                    setMenuAberto(false)
+                    onVerBackup()
+                  }}
+                />
+              )}
               {(ehAdministrador || precisaPrimeiroCadastro) && (
                 <MenuItem
                   icone={<Users size={18} />}
@@ -472,7 +474,16 @@ export default function TelaHome({
           )}
         </section>
 
-        {caixa === 'prioridade' && maisAntigos.length === 0 && (
+        {!sessao && (
+          <section>
+            <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              Sem identificação você está no modo consulta. Toque em entrar no cabeçalho para
+              executar manutenções.
+            </p>
+          </section>
+        )}
+
+        {sessao && caixa === 'prioridade' && maisAntigos.length === 0 && (
           <section>
             <p className="rounded-xl bg-slate-100 p-3 text-xs text-slate-600">
               Nenhum equipamento de {GRUPOS.find((g) => g.id === grupo)?.rotulo} com manutenção
@@ -481,7 +492,7 @@ export default function TelaHome({
           </section>
         )}
 
-        {caixa === 'prioridade' && maisAntigos.length > 0 && (
+        {sessao && caixa === 'prioridade' && maisAntigos.length > 0 && (
           <section>
             <h2 className="mb-2 px-1 text-xs font-bold tracking-wide text-slate-500 uppercase">
               Tempo sem manutenção
@@ -540,7 +551,7 @@ export default function TelaHome({
           </section>
         )}
 
-        {caixa === 'rascunho' && ultimas && ultimas.length > 0 && (
+        {sessao && caixa === 'rascunho' && ultimas && ultimas.length > 0 && (
           <section>
             <div className="space-y-2 px-1">
               {rascunhosDoGrupo.map(({ exec, total }) => {
