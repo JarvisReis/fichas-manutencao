@@ -488,7 +488,7 @@ export default function TelaHome({
                     onClick={() =>
                       equip ? onNovaExecucaoDoEquipamento(equip) : onAbrirExecucao(exec.id)
                     }
-                    className="flex w-full items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-3.5 text-left"
+                    className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 text-left"
                   >
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
                       <Clock size={18} />
