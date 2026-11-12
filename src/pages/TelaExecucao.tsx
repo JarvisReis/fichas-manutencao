@@ -15,6 +15,8 @@ interface Props {
   onAtualizar: (patch: Partial<Execucao>) => void
   /** ficha salva em modo leitura: abre uma manutenção nova do mesmo equipamento */
   onNovaManutencao?: () => void
+  /** sem pessoa identificada: o app só visualiza, não grava */
+  semIdentificacao?: boolean
 }
 
 /** Patrimônios dos instrumentos guardados nos campos fixos da execução. */
@@ -56,6 +58,7 @@ export default function TelaExecucao({
   onSalvar,
   onAtualizar,
   onNovaManutencao,
+  semIdentificacao = false,
 }: Props) {
   const [valores, setValores] = useState<ValorItem[]>(execucao.valores)
   const [obsGeral, setObsGeral] = useState(execucao.observacaoGeral ?? '')
@@ -582,7 +585,9 @@ export default function TelaExecucao({
         {!podeAlterar ? (
           <div className="space-y-2">
             <p className="rounded-xl bg-slate-100 px-3 py-2 text-center text-xs font-semibold text-slate-600">
-              Ficha concluída — somente leitura.
+              {semIdentificacao
+                ? 'Sem identificação — só visualização. Toque em entrar no cabeçalho para executar.'
+                : 'Ficha concluída — somente leitura.'}
             </p>
             {onNovaManutencao && (
               <button

@@ -60,7 +60,19 @@ export default function App() {
   }, [])
   const [online, setOnline] = useState(navigator.onLine)
   const { tema, alternar } = useTema()
-  const { sessao, entrar, sair, ehAdministrador } = useSessao()
+  const { sessao, entrar, sair: sairSessao, ehAdministrador } = useSessao()
+
+  /**
+   * Sair encerra o uso do aparelho: limpa a sessão, volta para a home e FECHA.
+   * Num PWA instalado `window.close()` não funciona, então a tela final pede
+   * para fechar — mas como a sessão já saiu, o app fica só em leitura de
+   * qualquer forma.
+   */
+  const sair = useCallback(() => {
+    sairSessao()
+    setRotaState({ nome: 'home' })
+    window.close()
+  }, [sairSessao])
 
   // Quantas pessoas existem no cadastro. Com zero, o administrador ainda não
   // existe e o app precisa abrir a tela de cadastros — senão nasce trancado.
@@ -147,6 +159,8 @@ export default function App() {
    * nova só nasce pelo botão "Nova manutenção" dessa tela.
    */
   const abrirUltimaManutencao = async (equipamento: Equipamento) => {
+    // Sem identificação o app é só de consulta: nada de criar ficha nova nem
+    // abrir rascunho para edição. Só mostra a última manutenção, em leitura.
     const nome = equipamento.nome.trim()
     const todas = await db.execucoes.toArray()
     const doEquipamento = todas
@@ -154,6 +168,10 @@ export default function App() {
       .sort((a, b) => Date.parse(b.dataHora) - Date.parse(a.dataHora))
 
     if (doEquipamento.length === 0) {
+      if (!sessao) {
+        setIdentificando(true)
+        return
+      }
       await novaExecucaoDoEquipamento(equipamento)
       return
     }
@@ -165,6 +183,10 @@ export default function App() {
     // Rascunho abre para edição (é trabalho em andamento); concluída abre em
     // leitura, com o botão de nova manutenção no rodapé.
     if (ultima.status === 'rascunho') {
+      if (!sessao) {
+        setRota({ nome: 'ficha', ficha, execucao: ultima, equipamento })
+        return
+      }
       if (!podeEditarExecucao(ultima, sessao, ultima.criadaPor).pode) {
         await novaExecucaoDoEquipamento(equipamento)
         return
@@ -251,7 +273,10 @@ export default function App() {
         <TelaExecucao
           ficha={rota.ficha}
           execucao={rota.execucao}
-          podeAlterar={podeEditarExecucao(rota.execucao, sessao, rota.execucao.criadaPor).pode}
+          podeAlterar={
+            !!sessao && podeEditarExecucao(rota.execucao, sessao, rota.execucao.criadaPor).pode
+          }
+          semIdentificacao={!sessao}
           onVoltar={() => setRota({ nome: 'identificacao', ficha: rota.ficha, execucao: rota.execucao })}
           onAtualizar={(patch) => atualizarExecucao(rota.execucao.id, patch)}
           onSalvar={(status) => void salvarExecucao(rota.execucao.id, status)}
