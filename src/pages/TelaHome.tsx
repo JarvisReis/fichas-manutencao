@@ -339,13 +339,6 @@ export default function TelaHome({
 
         {sessao && (
         <section>
-          <h2 className="mb-2 px-1 text-xs font-bold tracking-wide text-slate-500 uppercase">
-            Novo serviço
-          </h2>
-          <p className="mb-2 px-1 text-xs text-slate-500">
-            Escolha o equipamento — para visualizar dados completos.
-          </p>
-
           <div className="mb-2 grid grid-cols-2 gap-2">
             {GRUPOS.map((g) => (
               <button
