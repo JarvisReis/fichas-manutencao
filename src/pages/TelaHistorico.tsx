@@ -1,0 +1,140 @@
+import { useLiveQuery } from 'dexie-react-hooks'
+import { ArrowLeft, CheckCircle2, Clock, Trash2 } from 'lucide-react'
+import { db } from '../lib/db'
+import { getFicha } from '../config/fichas'
+import { avaliarItem, valorExibido } from '../lib/conformidade'
+
+interface Props {
+  onVoltar: () => void
+  onAbrir: (id: string) => void
+}
+
+export default function TelaHistorico({ onVoltar, onAbrir }: Props) {
+  const execucoes = useLiveQuery(
+    () => db.execucoes.orderBy('atualizadaEm').reverse().toArray(),
+    [],
+    [],
+  )
+
+  const excluir = async (id: string) => {
+    const fotos = await db.fotos.where('execucaoId').equals(id).toArray()
+    for (const f of fotos) await db.fotos.delete(f.id)
+    await db.execucoes.delete(id)
+  }
+
+  return (
+    <div className="min-h-full pb-10">
+      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
+        <div className="flex items-center gap-3">
+          <button onClick={onVoltar} className="rounded-xl p-2 text-slate-600 active:bg-slate-100" aria-label="Voltar">
+            <ArrowLeft size={22} />
+          </button>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-slate-900">Histórico</p>
+            <p className="text-xs text-slate-500">{execucoes?.length ?? 0} execução(ões) neste aparelho</p>
+          </div>
+        </div>
+      </header>
+
+      <div className="space-y-3 p-4">
+        {execucoes?.length === 0 && (
+          <p className="rounded-2xl border-2 border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+            Nenhuma execução registrada ainda.
+          </p>
+        )}
+
+        {execucoes?.map((exec) => {
+          const ficha = getFicha(exec.fichaId)
+          const fora = ficha
+            ? ficha.itens.filter(
+                (item) =>
+                  avaliarItem(
+                    item,
+                    exec.valores.find((v) => v.itemId === item.id)?.valor ?? '',
+                    exec.marca,
+                  ).resultado === 'nao_conforme',
+              ).length
+            : 0
+          const preenchidos = exec.valores.filter((v) => v.valor !== '').length
+
+          return (
+            <div key={exec.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-slate-900">{exec.codigo}</p>
+                  <p className="text-xs text-slate-500">
+                    {ficha?.nomeCurto ?? exec.fichaId} · {exec.local || 'sem local'}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {new Date(exec.dataHora).toLocaleString('pt-BR')}
+                  </p>
+                </div>
+                <button
+                  onClick={() => void excluir(exec.id)}
+                  className="rounded-lg p-2 text-slate-400 active:bg-slate-100"
+                  aria-label="Excluir execução"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-medium">
+                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">
+                  {preenchidos}/{ficha?.itens.length ?? 0} medidos
+                </span>
+                {fora > 0 && (
+                  <span className="rounded-full bg-red-100 px-2.5 py-1 text-red-700">{fora} fora do limite</span>
+                )}
+                {exec.status === 'concluida' ? (
+                  <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-700">
+                    <CheckCircle2 size={11} /> concluída
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-amber-700">
+                    <Clock size={11} /> rascunho
+                  </span>
+                )}
+                {!exec.sincronizada && (
+                  <span className="rounded-full bg-blue-100 px-2.5 py-1 text-blue-700">pendente de envio</span>
+                )}
+              </div>
+
+              {ficha && (
+                <details className="mt-3">
+                  <summary className="cursor-pointer text-xs font-semibold text-blue-700">
+                    Ver medições
+                  </summary>
+                  <ul className="mt-2 space-y-1.5">
+                    {ficha.itens.map((item) => {
+                      const bruto = exec.valores.find((v) => v.itemId === item.id)?.valor ?? ''
+                      const analise = avaliarItem(item, bruto, exec.marca)
+                      const cor =
+                        analise.resultado === 'conforme'
+                          ? 'text-emerald-700'
+                          : analise.resultado === 'nao_conforme'
+                            ? 'text-red-700'
+                            : 'text-slate-500'
+                      return (
+                        <li key={item.id} className="flex justify-between gap-2 text-xs">
+                          <span className="min-w-0 flex-1 truncate text-slate-600">{item.nome}</span>
+                          <span className={`shrink-0 font-bold ${cor}`}>{valorExibido(item, bruto)}</span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </details>
+              )}
+
+              <button
+                onClick={() => onAbrir(exec.id)}
+                className="mt-3 w-full rounded-xl border-2 border-slate-300 py-2.5 text-xs font-semibold text-slate-700 active:bg-slate-100"
+              >
+                Abrir e editar
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
