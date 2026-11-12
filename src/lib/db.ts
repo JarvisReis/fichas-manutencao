@@ -101,14 +101,24 @@ export async function lerNucleoInstalado(
   return candidatas[0]?.nucleoInstalado?.trim()
 }
 
-export function gerarCodigo(prefixo: string, existentes: { codigo: string }[]): string {
-  const hoje = new Date()
-  const dia = `${hoje.getFullYear()}${String(hoje.getMonth() + 1).padStart(2, '0')}${String(
-    hoje.getDate(),
-  ).padStart(2, '0')}`
-  const base = `${prefixo}-${dia}`
-  const doDia = existentes.filter((e) => e.codigo.startsWith(base)).length
-  return `${base}-${String(doDia + 1).padStart(3, '0')}`
+/**
+ * Identificação da manutenção: nome do equipamento + data.
+ *
+ * O código antigo (CT-20261112-001) não dizia nada em campo; o técnico lê
+ * "CT 02 · 12/11/2026" e sabe de que equipamento e de que dia é a ficha.
+ * Se o mesmo equipamento tiver duas manutenções no mesmo dia, acrescenta o
+ * horário — assim a identificação continua única.
+ */
+export function gerarCodigo(
+  equipamento: string,
+  data: Date = new Date(),
+  existentes: { codigo: string }[] = [],
+): string {
+  const dia = data.toLocaleDateString('pt-BR')
+  const base = `${equipamento.trim()} · ${dia}`
+  if (!existentes.some((e) => e.codigo === base)) return base
+  const hora = data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  return `${base} ${hora}`
 }
 
 /** Comprime a foto no cliente antes de guardar (alvo < 300 KB). */

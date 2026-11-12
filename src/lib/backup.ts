@@ -127,6 +127,19 @@ export async function montarPacoteExecucao(execucaoId: string): Promise<PacoteBa
   }
 }
 
+/**
+ * Nome de arquivo seguro. A identificação agora é "CT 02 · 12/11/2026", que tem
+ * espaço, ponto central e barras — tudo proibido em nome de arquivo.
+ */
+function nomeDoArquivo(codigo: string, dataHora: string): string {
+  const limpo = codigo
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return `FICHAS-METRO_${limpo}_${dataHora.slice(0, 10)}.json`
+}
+
 /** Exporta uma execucao sozinha, com nome de arquivo rastreavel. */
 export async function exportarExecucao(execucaoId: string): Promise<{ nome: string; bytes: number }> {
   const pacote = await montarPacoteExecucao(execucaoId)
@@ -134,7 +147,7 @@ export async function exportarExecucao(execucaoId: string): Promise<{ nome: stri
   const exec = pacote.execucoes[0]
   const json = JSON.stringify(pacote, null, 2)
   const blob = new Blob([json], { type: 'application/json' })
-  const nome = `FICHAS-METRO_${exec.codigo}_${exec.dataHora.slice(0, 10)}.json`
+  const nome = nomeDoArquivo(exec.codigo, exec.dataHora)
   baixarBlob(blob, nome)
   return { nome, bytes: blob.size }
 }
@@ -145,7 +158,7 @@ export async function compartilharExecucao(execucaoId: string): Promise<boolean>
   if (!pacote) throw new Error('Execucao nao encontrada')
   const exec = pacote.execucoes[0]
   const json = JSON.stringify(pacote, null, 2)
-  const nome = `FICHAS-METRO_${exec.codigo}_${exec.dataHora.slice(0, 10)}.json`
+  const nome = nomeDoArquivo(exec.codigo, exec.dataHora)
   const arquivo = new File([json], nome, { type: 'application/json' })
 
   if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [arquivo] })) {

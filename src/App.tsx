@@ -76,7 +76,7 @@ export default function App() {
     const agora = new Date()
     const execucao: Execucao = {
       id: crypto.randomUUID(),
-      codigo: gerarCodigo(ficha.prefixo, existentes),
+      codigo: gerarCodigo(equipamento.nome, agora, existentes),
       fichaId: ficha.id,
       cabecalho: {},
       camposFixos: { equipamento: equipamento.nome },
