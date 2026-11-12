@@ -128,20 +128,13 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
       return
     }
     setAvisoEquipe(null)
+    const rg = pessoa.rg.trim()
     const atuais = extrairRgs(camposFixos)
-    const jaEsta = atuais.some((rg) => rg.trim() === pessoa.rg.trim())
-    const proximos = jaEsta
-      ? atuais.filter((rg) => rg.trim() !== pessoa.rg.trim())
-      : [...atuais, pessoa.rg]
+    const jaEsta = atuais.some((r) => r.trim() === rg)
+    const proximos = jaEsta ? atuais.filter((r) => r.trim() !== rg) : [...atuais, rg]
 
-    const proximoMapa = { ...camposFixos }
-    for (let i = 1; i <= 6; i++) {
-      const valor = proximos[i - 1] ?? ''
-      if (valor) proximoMapa[`rg${i}`] = valor
-      else delete proximoMapa[`rg${i}`]
-    }
-    setCamposFixos(proximoMapa)
-    salvarCampos({ camposFixos: proximoMapa })
+    setCamposFixos(reconstruirRgs(camposFixos, proximos))
+    salvarCampos({ camposFixos: reconstruirRgs(camposFixos, proximos) })
   }
 
   const selecionarEquipamento = (equipamento: Equipamento | null, texto: string) => {
@@ -171,7 +164,7 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
   const continuar = () => {
     if (!podeContinuar) return
     // O núcleo retirado só existe na P2; na P1 o campo é descartado.
-    const fixosSaida: Record<string, string> = { ...camposFixos }
+    const fixosSaida: Record<string, string> = reconstruirRgs(camposFixos, equipe)
     if (ehP2 && nucleoRetirado) fixosSaida.serieRetirado = nucleoRetirado
     else delete fixosSaida.serieRetirado
 
@@ -479,11 +472,42 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
   )
 }
 
-/** RGs já registrados nos campos fixos, na ordem rg1..rg6. */
+/**
+ * RGs da equipe, na ordem rg1..rg6.
+ *
+ * Campos `rgN` de fichas antigas podem carregar lixo (espaço, vírgula, RG de
+ * pessoa que saiu do cadastro). Aqui só passa o que tem cara de RG — dígitos,
+ * com pontuação comum — para a lista da equipe não exibir entrada sem nome.
+ */
 function extrairRgs(camposFixos: Record<string, string>): string[] {
-  return [1, 2, 3, 4, 5, 6]
-    .map((i) => camposFixos[`rg${i}`] ?? '')
-    .filter((rg) => rg.trim().length > 0)
+  const vistos = new Set<string>()
+  const lista: string[] = []
+  for (let i = 1; i <= 6; i++) {
+    const bruto = (camposFixos[`rg${i}`] ?? '').trim()
+    if (!bruto || !/^[0-9][0-9.\-/]*$/.test(bruto) || !/[0-9]/.test(bruto)) continue
+    const chave = bruto.replace(/[^0-9a-z]/gi, '').toLowerCase()
+    if (vistos.has(chave)) continue
+    vistos.add(chave)
+    lista.push(bruto)
+  }
+  return lista
+}
+
+/**
+ * Regrava os campos rg1..rgN a partir da lista limpa, apagando as posições que
+ * sobraram — é o que impede RG órfão de continuar gravado na execução.
+ */
+function reconstruirRgs(
+  camposFixos: Record<string, string>,
+  rgs: string[],
+): Record<string, string> {
+  const mapa: Record<string, string> = { ...camposFixos }
+  for (let i = 1; i <= 6; i++) {
+    const valor = rgs[i - 1]
+    if (valor) mapa[`rg${i}`] = valor
+    else delete mapa[`rg${i}`]
+  }
+  return mapa
 }
 
 /**
