@@ -622,8 +622,9 @@ function ConfirmarExclusao({
       <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
         <h2 className="text-base font-bold text-slate-900">Excluir {rotulo}?</h2>
         <p className="mt-2 text-sm text-slate-600">
-          <strong>{nome}</strong> será apagado do cadastro. Se ele já tem fichas executadas, o
-          histórico continua guardado, mas o cadastro não volta.
+          <strong>{nome}</strong> será apagado do cadastro e não há como desfazer.
+          {rotulo === 'funcionário' &&
+            ' As fichas já executadas continuam no histórico, mas o nome sai da equipe.'}
         </p>
         <div className="mt-4 flex gap-2">
           <button
