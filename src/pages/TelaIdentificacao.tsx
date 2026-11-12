@@ -149,8 +149,12 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
     })
   }
 
+  // Equipe é obrigatória no mínimo com 2 pessoas: a ficha é preenchida em dupla
+  // e o registro precisa identificar quem mediu e quem acompanhou.
+  const equipe = extrairRgs(camposFixos)
+  const equipeCompleta = equipe.length >= 2
   const podeContinuar =
-    local.trim().length > 0 && (!ficha.exigeMarca || !!marca) && !!tipoManutencao
+    local.trim().length > 0 && (!ficha.exigeMarca || !!marca) && !!tipoManutencao && equipeCompleta
 
   const continuar = () => {
     if (!podeContinuar) return
@@ -322,13 +326,25 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
 
         <section className="rounded-2xl border-2 border-slate-200 bg-white p-4">
           <div className="mb-3 flex items-center gap-2">
-            <h3 className="text-sm font-semibold text-slate-900">Equipe</h3>
+            <h3 className="text-sm font-semibold text-slate-900">Equipe *</h3>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                equipeCompleta ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+              }`}
+            >
+              {equipe.length}/2 pessoas
+            </span>
           </div>
           <SeletorEquipe
             pessoas={pessoas}
-            selecionados={extrairRgs(camposFixos)}
+            selecionados={equipe}
             onAlternar={selecionarPessoa}
           />
+          {!equipeCompleta && (
+            <p className="mt-2 text-[11px] font-medium text-amber-800">
+              Marque no mínimo 2 pessoas da equipe para iniciar as medições.
+            </p>
+          )}
         </section>
 
         <section className="rounded-2xl border-2 border-slate-200 bg-white p-4">
