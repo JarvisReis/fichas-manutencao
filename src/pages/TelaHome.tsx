@@ -62,12 +62,18 @@ export default function TelaHome({
   /** Última execução de cada equipamento, para o cartão mostrar a manutenção feita. */
   const todas = useLiveQuery(() => db.execucoes.toArray(), [], [])
   const ultimaPorEquipamento = useMemo(() => {
-    const mapa = new Map<string, (typeof todas)[number]>()
-    for (const exec of [...(todas ?? [])].sort(
-      (a, b) => Date.parse(b.dataHora) - Date.parse(a.dataHora),
-    )) {
+    const mapa = new Map<string, { exec: (typeof todas)[number]; total: number }>()
+    const ordenadas = [...(todas ?? [])]
+      .filter((e) => e.status !== 'rascunho')
+      .sort((a, b) => Date.parse(b.dataHora) - Date.parse(a.dataHora))
+    for (const exec of ordenadas) {
       const nome = exec.camposFixos.equipamento?.trim()
-      if (nome && !mapa.has(nome)) mapa.set(nome, exec)
+      if (!nome) continue
+      const atual = mapa.get(nome)
+      // Rascunho não entra: o cartão mostra a última manutenção encerrada, e a
+      // contagem é o total de manutenções fechadas daquele equipamento.
+      if (atual) mapa.set(nome, { exec: atual.exec, total: atual.total + 1 })
+      else mapa.set(nome, { exec, total: 1 })
     }
     return mapa
   }, [todas])
@@ -243,7 +249,10 @@ export default function TelaHome({
                       <span className="mt-0.5 block text-[11px] font-medium text-blue-700">
                         {ficha ? ficha.nomeCurto : 'ficha não definida'}
                       </span>
-                      <UltimaManutencao exec={ultimaPorEquipamento.get(equip.nome)} />
+                      <UltimaManutencao
+                        exec={ultimaPorEquipamento.get(equip.nome)?.exec}
+                        total={ultimaPorEquipamento.get(equip.nome)?.total ?? 0}
+                      />
                     </span>
                     <ChevronRight size={18} className="shrink-0 text-slate-400" />
                   </button>
@@ -356,7 +365,7 @@ export default function TelaHome({
  * Última manutenção daquele equipamento. Mostra quando foi, que tipo (P1/P2) e
  * se está concluída — é o que o técnico olha antes de abrir um serviço novo.
  */
-function UltimaManutencao({ exec }: { exec: Execucao | undefined }) {
+function UltimaManutencao({ exec, total }: { exec: Execucao | undefined; total: number }) {
   if (!exec) {
     return (
       <span className="mt-1.5 flex items-center gap-1 text-[11px] text-slate-500">
@@ -386,6 +395,11 @@ function UltimaManutencao({ exec }: { exec: Execucao | undefined }) {
       >
         {exec.status === 'pendente' ? 'PENDENTE' : aberta ? 'RASCUNHO' : 'CONCLUÍDA'}
       </span>
+      {total > 1 && (
+        <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-600">
+          {total} MANUT.
+        </span>
+      )}
     </span>
   )
 }
