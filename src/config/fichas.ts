@@ -77,6 +77,8 @@ export const FICHAS: DefinicaoFicha[] = [
       },
     ],
     camposFixos: [
+      { id: 'microPatrimonio', nome: 'Microohmímetro — Patrimônio', tipo: 'texto' },
+      { id: 'megaPatrimonio', nome: 'Megômetro — Patrimônio', tipo: 'texto' },
       { id: 'torqPatrimonio', nome: 'Torquímetro — Patrimônio', tipo: 'texto' },
       { id: 'serieInstalado', nome: 'Nº Série do Núcleo — Instalado', tipo: 'lista', lista: 'nucleos' },
       { id: 'serieRetirado', nome: 'Nº Série do Núcleo — Retirado', tipo: 'lista', lista: 'nucleos' },
@@ -168,6 +170,8 @@ export const FICHAS: DefinicaoFicha[] = [
       },
     ],
     camposFixos: [
+      { id: 'microPatrimonio', nome: 'Microohmímetro — Patrimônio', tipo: 'texto' },
+      { id: 'megaPatrimonio', nome: 'Megômetro — Patrimônio', tipo: 'texto' },
       { id: 'torqPatrimonio', nome: 'Torquímetro — Patrimônio', tipo: 'texto' },
       { id: 'rg1', nome: 'Funcionário 1 — RG', tipo: 'texto' },
       { id: 'rg2', nome: 'Funcionário 2 — RG', tipo: 'texto' },
@@ -228,6 +232,8 @@ export const FICHAS: DefinicaoFicha[] = [
       },
     ],
     camposFixos: [
+      { id: 'microPatrimonio', nome: 'Microohmímetro — Patrimônio', tipo: 'texto' },
+      { id: 'megaPatrimonio', nome: 'Megômetro — Patrimônio', tipo: 'texto' },
       { id: 'torqPatrimonio', nome: 'Torquímetro — Patrimônio', tipo: 'texto' },
       { id: 'rg1', nome: 'Funcionário 1 — RG', tipo: 'texto' },
       { id: 'rg2', nome: 'Funcionário 2 — RG', tipo: 'texto' },
