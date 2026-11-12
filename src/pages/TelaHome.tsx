@@ -39,8 +39,17 @@ export default function TelaHome({
   online,
 }: Props) {
   const pendentes = useLiveQuery(() => db.execucoes.filter((e) => !e.sincronizada).toArray(), [], [])
+  // "Continuar" é só o trabalho em andamento: rascunho. Ficha concluída ou
+  // pendente é registro fechado e não se continua — fica no cartão do
+  // equipamento e no histórico.
   const ultimas = useLiveQuery(
-    () => db.execucoes.orderBy('atualizadaEm').reverse().limit(2).toArray(),
+    () =>
+      db.execucoes
+        .where('status')
+        .equals('rascunho')
+        .reverse()
+        .sortBy('atualizadaEm')
+        .then((lista) => lista.slice(0, 3)),
     [],
     [],
   )
