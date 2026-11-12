@@ -9,11 +9,18 @@ import { excluirExecucaoNoServidor, obterEndpointAdmin } from '../lib/sync'
 interface Props {
   /** só administrador apaga uma execução salva */
   podeExcluir: boolean
+  /** só administrador reabre uma ficha já concluída */
+  podeEditarConcluida: boolean
   onVoltar: () => void
   onAbrir: (id: string) => void
 }
 
-export default function TelaHistorico({ podeExcluir, onVoltar, onAbrir }: Props) {
+export default function TelaHistorico({
+  podeExcluir,
+  podeEditarConcluida,
+  onVoltar,
+  onAbrir,
+}: Props) {
   const execucoes = useLiveQuery(
     () => db.execucoes.orderBy('atualizadaEm').reverse().toArray(),
     [],
@@ -171,12 +178,25 @@ export default function TelaHistorico({ podeExcluir, onVoltar, onAbrir }: Props)
                 </details>
               )}
 
-              <button
-                onClick={() => onAbrir(exec.id)}
-                className="mt-3 w-full rounded-xl border-2 border-slate-300 py-2.5 text-xs font-semibold text-slate-700 active:bg-slate-100"
-              >
-                Abrir e editar
-              </button>
+              {(() => {
+                const concluida = exec.status === 'concluida'
+                const liberado = !concluida || podeEditarConcluida
+                if (!liberado) {
+                  return (
+                    <p className="mt-3 rounded-xl bg-slate-100 px-3 py-2 text-center text-[11px] font-medium text-slate-600">
+                      Concluída — só administrador reabre para corrigir.
+                    </p>
+                  )
+                }
+                return (
+                  <button
+                    onClick={() => onAbrir(exec.id)}
+                    className="mt-3 w-full rounded-xl border-2 border-slate-300 py-2.5 text-xs font-semibold text-slate-700 active:bg-slate-100"
+                  >
+                    {concluida ? 'Reabrir e corrigir' : 'Abrir e editar'}
+                  </button>
+                )
+              })()}
             </div>
           )
         })}

@@ -7,6 +7,8 @@ import { comprimirImagem, db } from '../lib/db'
 interface Props {
   ficha: DefinicaoFicha
   execucao: Execucao
+  /** rascunho é de quem executa; concluída só administrador reabre */
+  podeAlterar: boolean
   onVoltar: () => void
   onSalvar: (status: 'rascunho' | 'concluida') => void
   onAtualizar: (patch: Partial<Execucao>) => void
@@ -22,7 +24,14 @@ const corResultado = {
   vazio: { card: 'border-slate-200 bg-white', badge: 'bg-slate-200 text-slate-600', texto: '—' },
 } as const
 
-export default function TelaExecucao({ ficha, execucao, onVoltar, onSalvar, onAtualizar }: Props) {
+export default function TelaExecucao({
+  ficha,
+  execucao,
+  podeAlterar,
+  onVoltar,
+  onSalvar,
+  onAtualizar,
+}: Props) {
   const [valores, setValores] = useState<ValorItem[]>(execucao.valores)
   const [obsGeral, setObsGeral] = useState(execucao.observacaoGeral ?? '')
   const [fotos, setFotos] = useState<Record<string, string>>({})
@@ -160,6 +169,10 @@ export default function TelaExecucao({ ficha, execucao, onVoltar, onSalvar, onAt
   }
 
   const concluir = () => {
+    if (!podeAlterar) {
+      setAviso('Esta ficha está concluída. Só um administrador pode alterá-la.')
+      return
+    }
     if (pendentes > 0) {
       setAviso(`Ainda faltam ${pendentes} medição(ões) para preencher.`)
       return
@@ -302,7 +315,9 @@ export default function TelaExecucao({ ficha, execucao, onVoltar, onSalvar, onAt
           <h3 className="mb-2 text-sm font-semibold text-slate-900">Observação</h3>
           <textarea
             value={obsGeral}
+            readOnly={!podeAlterar}
             onChange={(e) => {
+              if (!podeAlterar) return
               setObsGeral(e.target.value)
               onAtualizar({ observacaoGeral: e.target.value })
             }}
@@ -374,6 +389,11 @@ export default function TelaExecucao({ ficha, execucao, onVoltar, onSalvar, onAt
       )}
 
       <footer className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 p-3 backdrop-blur">
+        {!podeAlterar ? (
+          <p className="rounded-xl bg-slate-100 px-3 py-3 text-center text-xs font-semibold text-slate-600">
+            Ficha concluída — somente leitura.
+          </p>
+        ) : (
         <div className="flex gap-2">
           <button
             onClick={() => onSalvar('rascunho')}
@@ -388,6 +408,7 @@ export default function TelaExecucao({ ficha, execucao, onVoltar, onSalvar, onAt
             <Check size={18} /> Concluir
           </button>
         </div>
+        )}
       </footer>
     </div>
   )

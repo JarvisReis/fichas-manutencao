@@ -91,9 +91,14 @@ export default function App() {
     setRota({ nome: 'identificacao', ficha, execucao })
   }
 
+  /**
+   * Abre a execução para edição. Rascunho é de quem executa; ficha concluída é
+   * registro fechado — só administrador reabre (e o histórico avisa antes).
+   */
   const abrirExecucao = async (id: string) => {
     const execucao = await db.execucoes.get(id)
     if (!execucao) return
+    if (execucao.status === 'concluida' && !ehAdministrador) return
     const ficha = getFicha(execucao.fichaId)
     if (!ficha) return
     setRota({ nome: 'execucao', ficha, execucao })
@@ -128,6 +133,7 @@ export default function App() {
         <TelaExecucao
           ficha={rota.ficha}
           execucao={rota.execucao}
+          podeAlterar={ehAdministrador || rota.execucao.status === 'rascunho'}
           onVoltar={() => setRota({ nome: 'identificacao', ficha: rota.ficha, execucao: rota.execucao })}
           onAtualizar={(patch) => atualizarExecucao(rota.execucao.id, patch)}
           onSalvar={(status) => void salvarExecucao(rota.execucao.id, status)}
@@ -138,6 +144,7 @@ export default function App() {
       return (
         <TelaHistorico
           podeExcluir={ehAdministrador}
+          podeEditarConcluida={ehAdministrador}
           onVoltar={() => setRota({ nome: 'home' })}
           onAbrir={(id) => void abrirExecucao(id)}
         />
