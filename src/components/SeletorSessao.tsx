@@ -11,6 +11,11 @@ interface Props {
   ehAdministrador: boolean
   onEntrar: (sessao: Sessao) => void
   onSair: () => void
+  /**
+   * Versão de uma linha só, sem moldura: vai dentro do cabeçalho azul da home.
+   * Fora dela, o componente mantém a caixa branca com o aviso de identificação.
+   */
+  compacto?: boolean
 }
 
 /**
@@ -18,7 +23,38 @@ interface Props {
  * pessoa ativa cadastrada. Administrador mantém cadastros e apaga execuções;
  * usuário só executa. A sessão vale no aparelho até alguém sair.
  */
-export default function SeletorSessao({ sessao, ehAdministrador, onEntrar, onSair }: Props) {
+export default function SeletorSessao({
+  sessao,
+  ehAdministrador,
+  onEntrar,
+  onSair,
+  compacto = false,
+}: Props) {
+  // entrar/tentar ficam antes do primeiro return porque o modo compacto
+  // (cabeçalho) também usa os dois.
+  const entrar = (pessoa: Pessoa) => {
+    onEntrar({
+      pessoaId: pessoa.id,
+      nome: pessoa.nome,
+      rg: pessoa.rg,
+      nivel: pessoa.nivel,
+    })
+    setAberto(false)
+    setRg('')
+    setErro(null)
+  }
+
+  const tentar = () => {
+    const termo = rg.trim()
+    if (!termo) return
+    const achado = pessoas.find((p) => p.rg.trim() === termo)
+    if (!achado) {
+      setErro('RG não encontrado entre os funcionários ativos.')
+      return
+    }
+    entrar(achado)
+  }
+
   const [pessoas, setPessoas] = useState<Pessoa[]>([])
   const [aberto, setAberto] = useState(false)
   const [rg, setRg] = useState('')
@@ -30,6 +66,27 @@ export default function SeletorSessao({ sessao, ehAdministrador, onEntrar, onSai
   }, [aberto])
 
   if (sessao) {
+    if (compacto) {
+      return (
+        <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-white/15 px-2.5 py-1.5 text-white">
+          <span className="shrink-0">
+            {ehAdministrador ? <ShieldCheck size={14} /> : <UserIcon size={14} />}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[11px] font-semibold leading-tight">{sessao.nome}</p>
+            <p className="truncate text-[10px] leading-tight text-blue-100">
+              RG {sessao.rg} · {ehAdministrador ? 'administrador' : 'usuário'}
+            </p>
+          </div>
+          <button
+            onClick={onSair}
+            className="flex shrink-0 items-center gap-1 rounded-lg bg-white/20 px-1.5 py-1 text-[10px] font-semibold text-white active:bg-white/30"
+          >
+            <LogOut size={11} /> Sair
+          </button>
+        </div>
+      )
+    }
     return (
       <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
         <span
@@ -57,28 +114,48 @@ export default function SeletorSessao({ sessao, ehAdministrador, onEntrar, onSai
     )
   }
 
-  const entrar = (pessoa: Pessoa) => {
-    onEntrar({
-      pessoaId: pessoa.id,
-      nome: pessoa.nome,
-      rg: pessoa.rg,
-      nivel: pessoa.nivel,
-    })
-    setAberto(false)
-    setRg('')
-    setErro(null)
+  // Sem sessão no cabeçalho: um botão só, na cor do header, sem caixa de aviso.
+  // O aviso completo aparece quando o técnico aperta.
+  if (compacto) {
+    if (!aberto) {
+      return (
+        <button
+          onClick={() => setAberto(true)}
+          className="flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-[11px] font-semibold text-white active:bg-white/25"
+        >
+          <LogIn size={13} /> Identificar-se
+        </button>
+      )
+    }
+    return (
+      <div className="flex-1 space-y-2 rounded-xl bg-white/15 p-2">
+        <div className="flex gap-1.5">
+          <input
+            value={rg}
+            onChange={(e) => {
+              setRg(e.target.value)
+              setErro(null)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') tentar()
+            }}
+            placeholder="RG"
+            inputMode="numeric"
+            autoFocus
+            className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-sm text-slate-900 outline-none"
+          />
+          <button
+            onClick={tentar}
+            className="shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-[11px] font-semibold text-blue-800"
+          >
+            Entrar
+          </button>
+        </div>
+        {erro && <p className="text-[10px] font-medium text-amber-100">{erro}</p>}
+      </div>
+    )
   }
 
-  const tentar = () => {
-    const termo = rg.trim()
-    if (!termo) return
-    const achado = pessoas.find((p) => p.rg.trim() === termo)
-    if (!achado) {
-      setErro('RG não encontrado entre os funcionários ativos.')
-      return
-    }
-    entrar(achado)
-  }
 
   return (
     <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-3">

@@ -174,6 +174,18 @@ export default function TelaHome({
   return (
     <div className="min-h-full pb-10">
       <header className="relative bg-gradient-to-br from-blue-800 to-blue-600 px-5 pt-8 pb-7 text-white">
+        {/* Barra do usuário no topo do cabeçalho: a mesma linha do rótulo e dos
+            controles. Não abre caixa nova — o header mantém a altura. */}
+        <div className="mb-3 flex items-center gap-2">
+          <SeletorSessao
+            sessao={sessao}
+            ehAdministrador={ehAdministrador}
+            onEntrar={onEntrar}
+            onSair={onSair}
+            compacto
+          />
+        </div>
+
         <div className="mb-1 flex items-center justify-between">
           <p className="text-xs font-medium tracking-wide text-blue-100 uppercase">Metrô · Manutenção</p>
           <div className="flex items-center gap-2">
@@ -251,13 +263,6 @@ export default function TelaHome({
       </header>
 
       <div className="space-y-5 p-4">
-        <SeletorSessao
-          sessao={sessao}
-          ehAdministrador={ehAdministrador}
-          onEntrar={onEntrar}
-          onSair={onSair}
-        />
-
         <section>
           <h2 className="mb-2 px-1 text-xs font-bold tracking-wide text-slate-500 uppercase">
             Novo serviço
@@ -298,14 +303,21 @@ export default function TelaHome({
             )}
           </div>
 
-          <div className="mb-2 grid grid-cols-3 gap-1.5">
+          <div
+            className={`mb-2 grid gap-1.5 ${
+              (ultimas?.length ?? 0) > 0 ? 'grid-cols-3' : 'grid-cols-2'
+            }`}
+          >
             {(
               [
                 { id: 'rascunho', rotulo: 'Rascunho', cor: 'bg-amber-600' },
                 { id: 'recente', rotulo: 'Mais recente', cor: 'bg-blue-700' },
                 { id: 'prioridade', rotulo: 'Prioridade', cor: 'bg-red-700' },
               ] as const
-            ).map((c) => (
+            )
+              // Sem rascunho aberto a etiqueta some — não há o que continuar.
+              .filter((c) => c.id !== 'rascunho' || (ultimas?.length ?? 0) > 0)
+              .map((c) => (
               <button
                 key={c.id}
                 onClick={() => setCaixa(c.id)}
