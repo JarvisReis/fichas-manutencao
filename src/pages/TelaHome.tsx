@@ -285,14 +285,16 @@ export default function TelaHome({
               onClick={() => setMenuAberto(false)}
             />
             <div className="absolute right-4 z-40 mt-1 w-60 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
-              <MenuItem
-                icone={<Database size={18} />}
-                rotulo="Histórico e fila de envio"
-                onClick={() => {
-                  setMenuAberto(false)
-                  onVerHistorico()
-                }}
-              />
+              {sessao && (
+                <MenuItem
+                  icone={<Database size={18} />}
+                  rotulo="Histórico e fila de envio"
+                  onClick={() => {
+                    setMenuAberto(false)
+                    onVerHistorico()
+                  }}
+                />
+              )}
               {ehAdministrador && (
                 <MenuItem
                   icone={<HardDriveDownload size={18} />}
@@ -369,7 +371,7 @@ export default function TelaHome({
           <div
             className={`mb-2 grid gap-1.5 ${
               rascunhosDoGrupo.length > 0 ? 'grid-cols-3' : 'grid-cols-2'
-            }`}
+            } ${sessao ? '' : 'hidden'}`}
           >
             {(
               [
@@ -393,7 +395,7 @@ export default function TelaHome({
             ))}
           </div>
 
-          {caixa !== 'recente' ? null : equipamentos.filter((e) => grupoDaFicha(e.fichaId) === grupo).length === 0 ? (
+          {!sessao || caixa !== 'recente' ? null : equipamentos.filter((e) => grupoDaFicha(e.fichaId) === grupo).length === 0 ? (
             <div className="rounded-2xl border-2 border-dashed border-slate-300 p-4">
               <p className="text-xs text-slate-600">
                 Nenhum equipamento de <strong>{GRUPOS.find((g) => g.id === grupo)?.rotulo}</strong>{' '}
