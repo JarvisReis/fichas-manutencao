@@ -48,8 +48,6 @@ export interface DefinicaoFicha {
    * Quando há mais de um, o app mostra um seletor na identificação.
    */
   tiposManutencao: TipoManutencao[]
-  /** campos de identificação da ficha (além de Local e data) */
-  camposCabecalho: CampoExtra[]
   itens: ItemFicha[]
   /** campos fixos por equipamento, guardados com memória do último valor */
   camposFixos: CampoExtra[]

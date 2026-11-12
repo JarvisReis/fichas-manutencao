@@ -22,7 +22,6 @@ interface Props {
 }
 
 export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualizar, onContinuar }: Props) {
-  const [cabecalho, setCabecalho] = useState<Record<string, string>>(execucao.cabecalho)
   const [camposFixos, setCamposFixos] = useState<Record<string, string>>(execucao.camposFixos)
   const [local, setLocal] = useState(execucao.local)
   const [dataHora, setDataHora] = useState(() => paraInputLocal(execucao.dataHora))
@@ -150,7 +149,6 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
 
     void salvarCamposFixos(ficha.id, fixosSaida)
     onAtualizar({
-      cabecalho,
       camposFixos: fixosSaida,
       local: local.trim(),
       marca,
@@ -277,29 +275,6 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
             />
           </label>
         </section>
-
-        {ficha.camposCabecalho.length > 0 && (
-          <section className="rounded-2xl border-2 border-slate-200 bg-white p-4">
-            <h3 className="mb-3 text-sm font-semibold text-slate-900">Cabeçalho da ficha</h3>
-            <div className="grid grid-cols-2 gap-3">
-              {ficha.camposCabecalho.map((campo) => (
-                <label key={campo.id} className={campo.id === 'ped' ? 'col-span-2' : ''}>
-                  <span className="mb-1 block text-xs font-medium text-slate-600">{campo.nome}</span>
-                  <input
-                    type="text"
-                    value={cabecalho[campo.id] ?? ''}
-                    onChange={(e) => {
-                      const proximo = { ...cabecalho, [campo.id]: e.target.value }
-                      setCabecalho(proximo)
-                      salvarCampos({ cabecalho: proximo })
-                    }}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-base text-slate-900 outline-none focus:border-blue-600"
-                  />
-                </label>
-              ))}
-            </div>
-          </section>
-        )}
 
         <section className="rounded-2xl border-2 border-slate-200 bg-white p-4">
           <div className="mb-3 flex items-center gap-2">

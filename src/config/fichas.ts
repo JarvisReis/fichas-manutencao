@@ -16,15 +16,6 @@ export const FICHAS: DefinicaoFicha[] = [
     prefixo: 'CT',
     exigeMarca: false,
     tiposManutencao: ['P1', 'P2'],
-    camposCabecalho: [
-      { id: 'ped', nome: 'PED', tipo: 'texto' },
-      { id: 'os1', nome: 'OS 1', tipo: 'texto' },
-      { id: 'data1', nome: 'Data OS 1', tipo: 'texto' },
-      { id: 'os2', nome: 'OS 2', tipo: 'texto' },
-      { id: 'data2', nome: 'Data OS 2', tipo: 'texto' },
-      { id: 'tipoMP', nome: 'Tipo MP', tipo: 'texto' },
-      { id: 'ct', nome: 'CT', tipo: 'texto' },
-    ],
     itens: [
       {
         id: 'barr-nucleo-barr',
@@ -87,10 +78,6 @@ export const FICHAS: DefinicaoFicha[] = [
     prefixo: 'CT',
     exigeMarca: true,
     tiposManutencao: ['P1', 'P2'],
-    camposCabecalho: [
-      { id: 'pedido', nome: 'Nº Pedido', tipo: 'texto' },
-      { id: 'tipoMP', nome: 'Tipo MP', tipo: 'texto' },
-    ],
     itens: [
       {
         id: 'nucleo-estrutura',
@@ -179,11 +166,6 @@ export const FICHAS: DefinicaoFicha[] = [
     prefixo: 'SC',
     exigeMarca: false,
     tiposManutencao: ['P1'],
-    camposCabecalho: [
-      { id: 'ped', nome: 'PED', tipo: 'texto' },
-      { id: 'os', nome: 'OS', tipo: 'texto' },
-      { id: 'tipoMP', nome: 'Tipo MP', tipo: 'texto' },
-    ],
     itens: [
       {
         id: 'corrente-motor',
