@@ -7,8 +7,9 @@ import {
   exportarExecucao,
   importarBackup,
 } from '../lib/backup'
-import { db } from '../lib/db'
+import { db, lerEndpointSync } from '../lib/db'
 import { getFicha } from '../config/fichas'
+import { enviarExecucao as enviarParaServidor, sincronizarPendentes } from '../lib/sync'
 
 interface Props {
   onVoltar: () => void
@@ -20,11 +21,20 @@ export default function TelaBackup({ onVoltar, onRestaurado }: Props) {
   const [processando, setProcessando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const inputArquivo = useRef<HTMLInputElement>(null)
+  const [endpoint, setEndpoint] = useState(() => lerEndpointSync())
+  const [pendentes, setPendentes] = useState<number | null>(null)
+  const [progresso, setProgresso] = useState<string | null>(null)
+
+  const contarPendentes = async () => {
+    const total = await db.execucoes.filter((e) => !e.sincronizada).count()
+    setPendentes(total)
+  }
   const [listaEnvios, setListaEnvios] = useState<
     { id: string; codigo: string; titulo: string; quando: string }[] | null
   >(null)
 
   const abrirListaEnvios = async () => {
+    await contarPendentes()
     const execs = await db.execucoes.orderBy('atualizadaEm').reverse().toArray()
     setListaEnvios(
       execs.map((e) => ({
@@ -46,6 +56,16 @@ export default function TelaBackup({ onVoltar, onRestaurado }: Props) {
     setErro(null)
     setMensagem(null)
     try {
+      if (endpoint.trim()) {
+        const r = await enviarParaServidor(id, endpoint.trim())
+        if (r.ok) {
+          setMensagem('Execução sincronizada com o SharePoint.')
+          await contarPendentes()
+        } else {
+          setErro(`Falha ao sincronizar: ${r.erro}`)
+        }
+        return
+      }
       const enviado = await compartilharExecucao(id)
       if (enviado) {
         setMensagem('Arquivo enviado pelo menu de compartilhamento.')
@@ -56,6 +76,40 @@ export default function TelaBackup({ onVoltar, onRestaurado }: Props) {
     } catch (e) {
       setErro(`Falha ao enviar: ${(e as Error).message}`)
     } finally {
+      setProcessando(false)
+    }
+  }
+
+  const sincronizarTudo = async () => {
+    const alvo = endpoint.trim()
+    if (!alvo) {
+      setErro('Configure o endereço de sincronização antes de enviar.')
+      return
+    }
+    setProcessando(true)
+    setErro(null)
+    setMensagem(null)
+    setProgresso(null)
+    try {
+      const r = await sincronizarPendentes(alvo, (feitas, total) =>
+        setProgresso(`Enviando ${feitas} de ${total}…`),
+      )
+      const partes = [`${r.gravadas} execução(ões) sincronizada(s).`]
+      if (r.ignoradas > 0) partes.push(`${r.ignoradas} já existiam.`)
+      if (r.falhas.length > 0) {
+        partes.push(
+          `Falha em ${r.falhas.length}: ${r.falhas
+            .slice(0, 2)
+            .map((f) => `${f.codigo} (${f.erro})`)
+            .join('; ')}`,
+        )
+      }
+      setMensagem(partes.join(' '))
+      await contarPendentes()
+    } catch (e) {
+      setErro(`Falha ao sincronizar: ${(e as Error).message}`)
+    } finally {
+      setProgresso(null)
       setProcessando(false)
     }
   }
@@ -136,6 +190,46 @@ export default function TelaBackup({ onVoltar, onRestaurado }: Props) {
             existir. Se o celular for perdido, trocado ou o app for desinstalado, os dados se perdem.
             Gere um backup ao fim de cada turno de medições.
           </p>
+        </section>
+
+        <section className="rounded-2xl border-2 border-slate-200 bg-white p-4">
+          <h3 className="mb-1 text-sm font-semibold text-slate-900">Sincronização</h3>
+          <p className="mb-3 text-xs text-slate-500">
+            Endereço do serviço de sincronização usado quando o celular está com rede. Sem ele, o
+            envio funciona pelo compartilhamento de arquivo.
+          </p>
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-medium text-slate-600">
+              Endereço de sincronização
+            </span>
+            <input
+              value={endpoint}
+              onChange={(e) => setEndpoint(e.target.value)}
+              placeholder="https://seu-servidor/fichas"
+              inputMode="url"
+              autoCapitalize="off"
+              autoCorrect="off"
+              className="w-full rounded-xl border-2 border-slate-300 px-3 py-2.5 text-base text-slate-900 outline-none focus:border-blue-600"
+            />
+          </label>
+
+          <div className="mt-3 space-y-2">
+            <button
+              onClick={() => void sincronizarTudo()}
+              disabled={processando || !endpoint.trim()}
+              className="w-full rounded-xl bg-blue-700 py-3 text-sm font-semibold text-white disabled:bg-slate-300"
+            >
+              Enviar pendentes ({pendentes ?? '…'})
+            </button>
+            <button
+              onClick={() => void contarPendentes()}
+              disabled={processando}
+              className="w-full rounded-xl border-2 border-slate-300 py-2.5 text-xs font-semibold text-slate-700 disabled:text-slate-400"
+            >
+              Atualizar contagem
+            </button>
+          </div>
+          {progresso && <p className="mt-2 text-[11px] text-slate-600">{progresso}</p>}
         </section>
 
         <section className="rounded-2xl border-2 border-slate-200 bg-white p-4">

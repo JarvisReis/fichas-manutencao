@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, ArrowRight, Info } from 'lucide-react'
 import type { DefinicaoFicha, Execucao, Marca, TipoManutencao } from '../types'
-import { lerCamposFixos, lerNucleoInstalado, salvarCamposFixos } from '../lib/db'
+import { lerCamposFixos, lerEndpointSync, lerNucleoInstalado, salvarCamposFixos } from '../lib/db'
+import { lerNucleoDoServidor } from '../lib/sync'
 import {
   lerEquipamentos,
   lerPessoas,
@@ -52,6 +53,18 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
     if (!equipamento || execucao.nucleoInstalado) return
     let cancelado = false
     void (async () => {
+      // 1) fonte da verdade: lista Contatores no SharePoint (via proxy)
+      const endpoint = lerEndpointSync()
+      if (endpoint) {
+        const doServidor = await lerNucleoDoServidor(endpoint, equipamento)
+        if (cancelado) return
+        if (doServidor) {
+          setNucleoInstalado(doServidor)
+          onAtualizar({ nucleoInstalado: doServidor })
+          return
+        }
+      }
+      // 2) sem servidor: última execução registrada neste aparelho
       const anterior = await lerNucleoInstalado(equipamento, {
         id: execucao.id,
         equipamento,
@@ -65,6 +78,7 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
     return () => {
       cancelado = true
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- recarrega quando o equipamento muda
   }, [execucao.camposFixos.equipamento, execucao.nucleoInstalado])
 
   // Cadastros: relidos ao abrir a tela e sempre que o app volta ao primeiro plano,

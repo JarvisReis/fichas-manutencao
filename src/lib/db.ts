@@ -22,6 +22,20 @@ export class FichasDB extends Dexie {
 
 export const db = new FichasDB()
 
+/**
+ * Endpoint de sincronização (proxy do Raspberry). Lido de VITE_SYNC_URL em tempo
+ * de build; `localStorage['fichas:syncUrl']` sobrescreve para testes em campo.
+ */
+export function lerEndpointSync(): string {
+  try {
+    const salvo = localStorage.getItem('fichas:syncUrl')
+    if (salvo && salvo.trim()) return salvo.trim()
+  } catch {
+    /* localStorage indisponível */
+  }
+  return (import.meta.env.VITE_SYNC_URL as string | undefined)?.trim() ?? ''
+}
+
 /** Memória de campos fixos por ficha (torquímetro, RGs, séries). */
 export async function lerCamposFixos(fichaId: string): Promise<Record<string, string>> {
   const registro = await db.config.get(`camposFixos:${fichaId}`)
