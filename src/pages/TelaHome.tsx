@@ -418,7 +418,7 @@ export default function TelaHome({
                     onClick={() => onNovaExecucaoDoEquipamento(equip)}
                     className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 text-left"
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
                       <Check size={18} />
                     </span>
                     <span className="min-w-0 flex-1">
