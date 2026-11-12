@@ -40,6 +40,12 @@ export default function TelaHome({
   temaEscuro,
   online,
 }: Props) {
+  // Sem identificação o app vai direto para a caixa de entrada: a home não
+  // mostra nada, e o caminho é único — identificar-se.
+  useEffect(() => {
+    if (!sessao) onEntrar()
+  }, [sessao, onEntrar])
+
   const pendentes = useLiveQuery(() => db.execucoes.filter((e) => !e.sincronizada).toArray(), [], [])
   // "Continuar" é só o trabalho em andamento: rascunho. Ficha concluída ou
   // pendente é registro fechado e não se continua — fica no cartão do
@@ -328,14 +334,6 @@ export default function TelaHome({
       </header>
 
       <div className="space-y-5 p-4">
-        {!sessao && (
-          <section>
-            <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-              Identifique-se para executar manutenções. Toque no ícone de entrar no cabeçalho.
-            </p>
-          </section>
-        )}
-
         {sessao && (
         <section>
           <div className="mb-2 grid grid-cols-2 gap-2">
