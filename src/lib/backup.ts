@@ -1,12 +1,21 @@
 import { db } from './db'
 import { getFicha } from '../config/fichas'
 import { avaliarItem, limiteExibido } from './conformidade'
+import {
+  gravarEquipamentos,
+  gravarPessoas,
+  lerEquipamentos,
+  lerPessoas,
+  type Equipamento,
+  type Pessoa,
+} from './cadastros'
 import type { DefinicaoFicha, Marca } from '../types'
 
 export type ResultadoExportado = 'conforme' | 'nao_conforme' | 'na'
 
 export interface PacoteBackup {
-  formato: 'fichas-backup'
+  /** `fichas-metro-backup` é o rótulo antigo — ainda aceito na importação. */
+  formato: 'fichas-backup' | 'fichas-metro-backup'
   versao: 1
   exportadoEm: string
   aparelho: string
@@ -37,12 +46,22 @@ export interface PacoteBackup {
     }[]
   }[]
   fotos: { id: string; execucaoId: string; itemId: string; base64: string; mime: string }[]
+  /**
+   * Cadastros do aparelho. Opcional porque backups gerados antes desta versão
+   * não os tinham — nesses, a importação traz só as fichas.
+   */
+  cadastros?: {
+    equipamentos: Equipamento[]
+    pessoas: Pessoa[]
+  }
 }
 
 /** Lê tudo do IndexedDB e monta o pacote de backup (JSON serializável). */
 export async function montarBackup(): Promise<PacoteBackup> {
   const execucoes = await db.execucoes.toArray()
   const fotos = await db.fotos.toArray()
+  const equipamentos = await lerEquipamentos()
+  const pessoas = await lerPessoas()
 
   const fotosSerializadas: PacoteBackup['fotos'] = []
   for (const foto of fotos) {
@@ -81,6 +100,7 @@ export async function montarBackup(): Promise<PacoteBackup> {
       }
     }),
     fotos: fotosSerializadas,
+    cadastros: { equipamentos, pessoas },
   }
 }
 
@@ -210,10 +230,43 @@ export async function importarBackup(texto: string): Promise<{
   execucoes: number
   fotos: number
   ignoradas: number
+  /** quantos cadastros voltaram — 0 em backup antigo, que só tinha fichas */
+  equipamentos: number
+  pessoas: number
 }> {
   const pacote = JSON.parse(texto) as PacoteBackup
-  if (pacote.formato !== 'fichas-backup') {
+  // Aceita o rótulo antigo: backups gerados antes da troca de nome ficaram com
+  // `fichas-metro-backup` gravado no arquivo. Recusar seria apagar o histórico
+  // de quem já tinha backup na mão.
+  if (pacote.formato !== 'fichas-backup' && pacote.formato !== 'fichas-metro-backup') {
     throw new Error('Arquivo não é um backup das fichas.')
+  }
+
+  // Cadastros primeiro: os cartões de equipamento dependem deles para mostrar
+  // nome, local e ficha. Backup antigo (sem o bloco) não apaga o que já existe.
+  let equipamentosImportados = 0
+  let pessoasImportadas = 0
+  if (pacote.cadastros) {
+    const equipAtuais = await lerEquipamentos()
+    const nomesAtuais = new Set(equipAtuais.map((e) => e.nome.trim().toLowerCase()))
+    const novosEquip = (pacote.cadastros.equipamentos ?? []).filter(
+      (e) => !nomesAtuais.has(e.nome.trim().toLowerCase()),
+    )
+    if (novosEquip.length > 0) {
+      await gravarEquipamentos([...equipAtuais, ...novosEquip])
+      equipamentosImportados = novosEquip.length
+    }
+
+    const pessoasAtuais = await lerPessoas()
+    // RG é a identidade da pessoa no app: mesmo RG não entra duas vezes.
+    const rgsAtuais = new Set(pessoasAtuais.map((p) => p.rg.trim()))
+    const novasPessoas = (pacote.cadastros.pessoas ?? []).filter(
+      (p) => !rgsAtuais.has(p.rg.trim()),
+    )
+    if (novasPessoas.length > 0) {
+      await gravarPessoas([...pessoasAtuais, ...novasPessoas])
+      pessoasImportadas = novasPessoas.length
+    }
   }
 
   let importadas = 0
@@ -264,7 +317,13 @@ export async function importarBackup(texto: string): Promise<{
     fotosImportadas++
   }
 
-  return { execucoes: importadas, fotos: fotosImportadas, ignoradas }
+  return {
+    execucoes: importadas,
+    fotos: fotosImportadas,
+    ignoradas,
+    equipamentos: equipamentosImportados,
+    pessoas: pessoasImportadas,
+  }
 }
 
 /** Item avaliado, pronto para o Power Automate apenas transportar (sem recalcular limites). */

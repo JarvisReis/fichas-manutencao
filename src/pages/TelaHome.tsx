@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { AlertTriangle, ChevronRight, Clock, CloudOff, Database, HardDriveDownload, Menu, Moon, Search, Sun, Users, Wifi, X } from 'lucide-react'
 import { db } from '../lib/db'
 import { FICHAS, GRUPOS, grupoDaFicha } from '../config/fichas'
-import { lerEquipamentos, normalizar, type Equipamento } from '../lib/cadastros'
+import { lerEquipamentos, lerPessoas, normalizar, type Equipamento, type Pessoa } from '../lib/cadastros'
 import type { Sessao } from '../lib/sessao'
 import type { Execucao } from '../types'
 import SeletorSessao from '../components/SeletorSessao'
@@ -162,10 +162,20 @@ export default function TelaHome({
 
   const [busca, setBusca] = useState('')
   const [equipamentos, setEquipamentos] = useState<Equipamento[]>([])
+  const [pessoas, setPessoas] = useState<Pessoa[]>([])
+
+  // Banco zerado (aparelho novo, ou dados do site limpos): ninguém consegue
+  // entrar como administrador, porque administrador é uma pessoa cadastrada.
+  // Sem esta saída o app nasce trancado — a tela de cadastros exige sessão de
+  // administrador, e o menu escondia o único caminho até ela.
+  const precisaPrimeiroCadastro = !ehAdministrador && pessoas.length === 0
 
   // Cadastros podem ser editados em outra tela: recarrega ao abrir e ao voltar.
   useEffect(() => {
-    const carregar = () => void lerEquipamentos().then(setEquipamentos)
+    const carregar = () => {
+      void lerEquipamentos().then(setEquipamentos)
+      void lerPessoas().then(setPessoas)
+    }
     carregar()
     const aoVoltar = () => {
       if (document.visibilityState === 'visible') carregar()
@@ -255,10 +265,10 @@ export default function TelaHome({
                   onVerBackup()
                 }}
               />
-              {ehAdministrador && (
+              {(ehAdministrador || precisaPrimeiroCadastro) && (
                 <MenuItem
                   icone={<Users size={18} />}
-                  rotulo="Equipe e equipamentos"
+                  rotulo={ehAdministrador ? 'Equipe e equipamentos' : 'Primeiro cadastro'}
                   onClick={() => {
                     setMenuAberto(false)
                     onVerCadastros()

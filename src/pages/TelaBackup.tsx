@@ -157,8 +157,13 @@ export default function TelaBackup({ onVoltar, onRestaurado, ehAdministrador }: 
     try {
       const texto = await arquivo.text()
       const r = await importarBackup(texto)
+      const cadastros = [
+        r.equipamentos > 0 ? `${r.equipamentos} equipamento(s)` : '',
+        r.pessoas > 0 ? `${r.pessoas} pessoa(s)` : '',
+      ].filter(Boolean)
       setMensagem(
         `Importado: ${r.execucoes} execução(ões) e ${r.fotos} foto(s).` +
+          (cadastros.length > 0 ? ` Cadastros: ${cadastros.join(' e ')}.` : '') +
           (r.ignoradas > 0 ? ` ${r.ignoradas} já existiam e foram mantidas.` : ''),
       )
       onRestaurado()
