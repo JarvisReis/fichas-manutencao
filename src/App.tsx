@@ -96,6 +96,41 @@ export default function App() {
   }
 
   /**
+   * Toque no equipamento da home: abre a ÚLTIMA manutenção dele, não uma ficha
+   * em branco. É o que o técnico quer ver — o que foi feito e quando. A ficha
+   * nova só nasce pelo botão "Nova manutenção" dessa tela.
+   */
+  const abrirUltimaManutencao = async (equipamento: Equipamento) => {
+    const nome = equipamento.nome.trim()
+    const todas = await db.execucoes.toArray()
+    const doEquipamento = todas
+      .filter((e) => (e.camposFixos.equipamento ?? '').trim() === nome)
+      .sort((a, b) => Date.parse(b.dataHora) - Date.parse(a.dataHora))
+
+    if (doEquipamento.length === 0) {
+      await novaExecucaoDoEquipamento(equipamento)
+      return
+    }
+
+    const ultima = doEquipamento[0]
+    const ficha = getFicha(ultima.fichaId)
+    if (!ficha) return
+
+    // Rascunho abre para edição (é trabalho em andamento); concluída abre em
+    // leitura, com o botão de nova manutenção no rodapé.
+    if (ultima.status === 'rascunho') {
+      if (!podeEditarExecucao(ultima, sessao, ultima.criadaPor).pode) {
+        await novaExecucaoDoEquipamento(equipamento)
+        return
+      }
+      setRota({ nome: 'execucao', ficha, execucao: ultima })
+      return
+    }
+
+    setRota({ nome: 'ficha', ficha, execucao: ultima, equipamento })
+  }
+
+  /**
    * Abre a execução para edição. Rascunho é de quem executa; ficha concluída é
    * registro fechado — só administrador reabre (e o histórico avisa antes).
    */
@@ -183,7 +218,7 @@ export default function App() {
             ehAdministrador={ehAdministrador}
             onEntrar={entrar}
             onSair={sair}
-            onNovaExecucaoDoEquipamento={(equip) => void novaExecucaoDoEquipamento(equip)}
+            onNovaExecucaoDoEquipamento={(equip) => void abrirUltimaManutencao(equip)}
             onAbrirExecucao={(id) => void abrirExecucao(id)}
             onVerHistorico={() => setRota({ nome: 'historico' })}
             onVerBackup={() => setRota({ nome: 'backup' })}
@@ -275,7 +310,7 @@ export default function App() {
           onEntrar={entrar}
           onSair={sair}
           ehAdministrador={ehAdministrador}
-          onNovaExecucaoDoEquipamento={(equip) => void novaExecucaoDoEquipamento(equip)}
+          onNovaExecucaoDoEquipamento={(equip) => void abrirUltimaManutencao(equip)}
           onAbrirExecucao={(id) => void abrirExecucao(id)}
           onVerHistorico={() => setRota({ nome: 'historico' })}
           onVerBackup={() => setRota({ nome: 'backup' })}
