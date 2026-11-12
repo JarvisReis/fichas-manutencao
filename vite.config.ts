@@ -30,8 +30,27 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
-        navigateFallback: '/index.html',
+        // `index.html` fica FORA do precache. Antes ele entrava, e o worker
+        // antigo servia o HTML velho indefinidamente: publicação nova nunca
+        // aparecia no aparelho e parecia que nada tinha sido corrigido.
+        globPatterns: ['**/*.{js,css,svg,png,woff2}'],
+        globIgnores: ['**/index.html', '**/registerSW.js'],
+        // Sem `navigateFallback`, a navegação vai sempre à rede primeiro.
+        // Offline continua funcionando pela rota `NetworkFirst` abaixo, que cai
+        // no cache quando não há sinal.
+        cleanupOutdatedCaches: true,
+        runtimeCaching: [
+          {
+            // Abertura do app: rede primeiro; sem rede, usa a última cópia.
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'fichas-html',
+              networkTimeoutSeconds: 4,
+              expiration: { maxEntries: 4 },
+            },
+          },
+        ],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
       devOptions: { enabled: false },
