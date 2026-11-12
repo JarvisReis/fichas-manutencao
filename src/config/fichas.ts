@@ -7,7 +7,7 @@ import type { DefinicaoFicha } from '../types'
  */
 export const GRUPOS: { id: string; rotulo: string }[] = [
   { id: 'contator', rotulo: 'Contator' },
-  { id: 'seccionadora', rotulo: 'Contator de Seccionadora' },
+  { id: 'seccionadora', rotulo: 'Seccionadora' },
 ]
 
 export function grupoDaFicha(fichaId: string): string {
