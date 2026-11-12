@@ -108,6 +108,11 @@ export default function TelaHome({
   }, [todas])
 
   const [menuAberto, setMenuAberto] = useState(false)
+  /**
+   * A home mostra uma caixa por vez. Rascunho é trabalho em andamento; Mais
+   * recente e Prioridade são as duas leituras do histórico de manutenções.
+   */
+  const [caixa, setCaixa] = useState<'rascunho' | 'recente' | 'prioridade'>('rascunho')
 
   // A aba escolhida sobrevive ao recarregar e a voltar de uma ficha concluída:
   // quem está na seccionadora não quer cair em contator toda vez.
@@ -153,17 +158,18 @@ export default function TelaHome({
         return termo.split(/\s+/).every((parte) => alvo.includes(parte))
       })
       .sort((a, b) => {
-        // Os três últimos equipamentos atendidos vêm no topo; o resto, alfabético.
+        // "Mais recente": os três últimos equipamentos atendidos vêm no topo.
+        // Nas outras leituras, ordem alfabética — quem manda é a caixa de baixo.
         const ia = ultimosEquipamentos.indexOf(a.nome.trim())
         const ib = ultimosEquipamentos.indexOf(b.nome.trim())
-        if (ia !== -1 || ib !== -1) {
+        if (caixa !== 'prioridade' && (ia !== -1 || ib !== -1)) {
           if (ia === -1) return 1
           if (ib === -1) return -1
           return ia - ib
         }
         return a.nome.localeCompare(b.nome, 'pt-BR')
       })
-  }, [equipamentos, busca, grupo, ultimosEquipamentos])
+  }, [equipamentos, busca, grupo, ultimosEquipamentos, caixa])
 
   return (
     <div className="min-h-full pb-10">
@@ -171,6 +177,14 @@ export default function TelaHome({
         <div className="mb-1 flex items-center justify-between">
           <p className="text-xs font-medium tracking-wide text-blue-100 uppercase">Metrô · Manutenção</p>
           <div className="flex items-center gap-2">
+          <span
+            className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+              online ? 'bg-emerald-500/20 text-emerald-100' : 'bg-amber-500/25 text-amber-50'
+            }`}
+          >
+            {online ? <Wifi size={12} /> : <CloudOff size={12} />}
+            {online ? 'Online' : 'Offline'}
+          </span>
           <button
             onClick={onAlternarTema}
             className="rounded-full bg-white/15 p-1.5 text-white active:bg-white/25"
@@ -188,14 +202,6 @@ export default function TelaHome({
           >
             {menuAberto ? <X size={16} /> : <Menu size={16} />}
           </button>
-          <span
-            className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
-              online ? 'bg-emerald-500/20 text-emerald-100' : 'bg-amber-500/25 text-amber-50'
-            }`}
-          >
-            {online ? <Wifi size={12} /> : <CloudOff size={12} />}
-            {online ? 'Online' : 'Offline'}
-          </span>
           </div>
         </div>
         {menuAberto && (
@@ -352,7 +358,29 @@ export default function TelaHome({
           )}
         </section>
 
-        {maisAntigos.length > 0 && (
+        <div className="grid grid-cols-3 gap-1.5">
+          {(
+            [
+              { id: 'rascunho', rotulo: 'Rascunho', cor: 'bg-amber-600' },
+              { id: 'recente', rotulo: 'Mais recente', cor: 'bg-blue-700' },
+              { id: 'prioridade', rotulo: 'Prioridade', cor: 'bg-red-700' },
+            ] as const
+          ).map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setCaixa(c.id)}
+              className={`rounded-xl px-2 py-2 text-[11px] font-semibold leading-tight transition ${
+                caixa === c.id
+                  ? `${c.cor} text-white`
+                  : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              {c.rotulo}
+            </button>
+          ))}
+        </div>
+
+        {caixa === 'prioridade' && maisAntigos.length > 0 && (
           <section>
             <h2 className="mb-2 px-1 text-xs font-bold tracking-wide text-slate-500 uppercase">
               Tempo sem manutenção
@@ -397,7 +425,7 @@ export default function TelaHome({
           </section>
         )}
 
-        {ultimas && ultimas.length > 0 && (
+        {caixa === 'rascunho' && ultimas && ultimas.length > 0 && (
           <section>
             <h2 className="mb-2 px-1 text-xs font-bold tracking-wide text-slate-500 uppercase">
               Continuar
