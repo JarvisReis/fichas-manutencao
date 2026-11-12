@@ -3,6 +3,7 @@ import { ArrowLeft, ChevronDown, Camera, Check, Infinity as Inf, Plus, Save, Tra
 import type { DefinicaoFicha, Execucao, Foto, Marca, ValorItem } from '../types'
 import { avaliarItem } from '../lib/conformidade'
 import { comprimirImagem, db } from '../lib/db'
+import { lerPessoas } from '../lib/cadastros'
 
 interface Props {
   ficha: DefinicaoFicha
@@ -14,6 +15,27 @@ interface Props {
   onAtualizar: (patch: Partial<Execucao>) => void
   /** ficha salva em modo leitura: abre uma manutenção nova do mesmo equipamento */
   onNovaManutencao?: () => void
+}
+
+/** Patrimônios dos instrumentos guardados nos campos fixos da execução. */
+const INSTRUMENTOS: [string, string][] = [
+  ['microPatrimonio', 'Microohmímetro'],
+  ['megaPatrimonio', 'Megômetro'],
+  ['torqPatrimonio', 'Torquímetro'],
+]
+
+/** Data e hora em pt-BR, curto o bastante para caber no cabeçalho da ficha. */
+function formatarDataHora(iso: string | undefined): string {
+  if (!iso) return '—'
+  const data = new Date(iso)
+  if (Number.isNaN(data.getTime())) return '—'
+  return data.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 /** Marcador da foto única anexada à observação final da execução. */
@@ -41,8 +63,19 @@ export default function TelaExecucao({
   const [carregandoFoto, setCarregandoFoto] = useState<string | null>(null)
   const [fotoObservacaoUrl, setFotoObservacaoUrl] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
+  const [nomePorRg, setNomePorRg] = useState<Record<string, string>>({})
 
   const marca = execucao.marca
+
+  // A equipe é gravada por RG; o nome vem do cadastro só para exibir a ficha.
+  useEffect(() => {
+    void (async () => {
+      const pessoas = await lerPessoas()
+      const mapa: Record<string, string> = {}
+      for (const p of pessoas) mapa[p.rg.trim()] = p.nome
+      setNomePorRg(mapa)
+    })()
+  }, [])
 
   /*
    * Ordem de preenchimento no teclado. Alguns teclados numéricos de Android
@@ -171,6 +204,16 @@ export default function TelaExecucao({
   const comCampo = analises.filter((a) => a.analise.resultado !== 'na').map((a) => a.item.id)
   const totalMedicoes = comCampo.length
 
+  // Dados de identificação exibidos na ficha salva: equipe e instrumentos.
+  const equipe = [1, 2, 3, 4, 5, 6]
+    .map((i) => (execucao.camposFixos[`rg${i}`] ?? '').trim())
+    .filter((rg) => rg.length > 0)
+    .map((rg) => ({ rg, nome: nomePorRg[rg] }))
+
+  const instrumentos = INSTRUMENTOS.filter(([campo]) =>
+    Boolean((execucao.camposFixos[campo] ?? '').trim()),
+  ).map(([campo, nome]) => [nome, execucao.camposFixos[campo]] as const)
+
   const tirarFotoObservacao = async (arquivo: File | undefined | null) => {
     if (!arquivo) return
     setCarregandoFoto('observacao')
@@ -250,6 +293,76 @@ export default function TelaExecucao({
       </header>
 
       <div className="space-y-3 p-4">
+        {/* Cabeçalho da manutenção: em ficha salva o técnico precisa ver de quem
+            é o equipamento e o que foi usado, não só os números medidos. */}
+        <section className="rounded-2xl border-2 border-slate-200 bg-white p-4">
+          <h3 className="mb-3 text-sm font-semibold text-slate-900">Identificação</h3>
+          <dl className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-sm">
+            {[
+              ['Equipamento', execucao.camposFixos.equipamento || '—'],
+              ['Local', execucao.local || '—'],
+              ['Ficha', ficha.nomeCurto],
+              ['Tipo', execucao.tipoManutencao || '—'],
+              ...(marca ? [[`Marca`, marca === 'merlin' ? 'Merlin Gerin' : 'Schneider']] : []),
+              ['Início', formatarDataHora(execucao.dataHora)],
+              ...(execucao.dataFim && execucao.dataFim !== execucao.dataHora
+                ? [['Encerramento', formatarDataHora(execucao.dataFim)]]
+                : []),
+              ...(execucao.nucleoInstalado
+                ? [['Núcleo instalado', execucao.nucleoInstalado]]
+                : []),
+              ...(execucao.camposFixos.serieRetirado
+                ? [['Núcleo retirado', execucao.camposFixos.serieRetirado]]
+                : []),
+            ].map(([rotulo, valor]) => (
+              <div key={rotulo} className="min-w-0">
+                <dt className="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
+                  {rotulo}
+                </dt>
+                <dd className="truncate text-sm font-medium text-slate-900">{valor}</dd>
+              </div>
+            ))}
+          </dl>
+
+          <div className="mt-3 border-t border-slate-200 pt-3">
+            <p className="mb-1.5 text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
+              Equipe
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {equipe.length === 0 && <span className="text-sm text-slate-500">—</span>}
+              {equipe.map((pessoa, i) => (
+                <span
+                  key={`${pessoa.rg}-${i}`}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-800"
+                >
+                  {pessoa.nome ?? '—'}
+                  <span className="rounded bg-white px-1 font-mono text-[10px] font-bold">
+                    RG {pessoa.rg}
+                  </span>
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {instrumentos.length > 0 && (
+            <div className="mt-3 border-t border-slate-200 pt-3">
+              <p className="mb-1.5 text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
+                Instrumentos
+              </p>
+              <ul className="space-y-0.5 text-sm text-slate-800">
+                {instrumentos.map(([nome, patrimonio]) => (
+                  <li key={nome}>
+                    {nome}{' '}
+                    <span className="font-mono text-xs font-semibold text-slate-600">
+                      {patrimonio}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+
         {ficha.itens.map((item, indice) => {
           const analise = avaliarItem(item, valorDe(item.id), marca)
           const cores = corResultado[analise.resultado]
