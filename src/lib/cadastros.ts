@@ -93,3 +93,35 @@ export function filtrarPessoas(lista: Pessoa[], busca: string): Pessoa[] {
 export function novoId(): string {
   return crypto.randomUUID()
 }
+
+/* --------------------------- cadastros no servidor -------------------------- */
+
+/**
+ * Fonte da verdade dos cadastros é o servidor (`admin-server.mjs` → lista
+ * ConfigFichas). O aparelho guarda uma cópia local com a versão recebida:
+ * o app nunca deixa uma cópia mais velha sobrescrever uma mais nova.
+ */
+const CHAVE_VERSAO = 'cadastro:versao'
+
+export async function lerVersao(): Promise<number> {
+  const registro = await db.config.get(CHAVE_VERSAO)
+  return registro ? Number(registro.valor) || 0 : 0
+}
+
+export async function gravarVersao(versao: number) {
+  await db.config.put({ chave: CHAVE_VERSAO, valor: String(versao) })
+}
+
+/** Aplica um conjunto de cadastros vindo do servidor, se for mais novo. */
+export async function aplicarCadastrosDoServidor(dados: {
+  versao: number
+  pessoas?: Pessoa[]
+  equipamentos?: Equipamento[]
+}): Promise<boolean> {
+  const local = await lerVersao()
+  if (!dados.versao || dados.versao < local) return false
+  if (Array.isArray(dados.pessoas)) await gravarPessoas(dados.pessoas)
+  if (Array.isArray(dados.equipamentos)) await gravarEquipamentos(dados.equipamentos)
+  await gravarVersao(dados.versao)
+  return true
+}

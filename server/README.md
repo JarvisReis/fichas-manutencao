@@ -107,6 +107,69 @@ sudo systemctl daemon-reload && sudo systemctl enable --now fichas-sync
 journalctl -u fichas-sync -f
 ```
 
+## 3b. Serviço de administração (cadastros com senha)
+
+O sync aceita execuções de qualquer aparelho com o token da equipe. **Cadastros
+(pessoas/equipamentos) e exclusão de execução só passam pelo `admin-server.mjs`**,
+que exige a senha de administrador. Assim, aparelho comprometido não altera a
+equipe nem apaga histórico no SharePoint.
+
+**Lista `ConfigFichas`** (uma linha só, criada uma vez):
+
+| Coluna | Tipo |
+|---|---|
+| Title | Texto — sempre `config` |
+| CadastrosVersao | Número |
+| PessoasJson | Texto multilinha |
+| EquipamentosJson | Texto multilinha |
+| AlteradoEm | Texto (ISO) |
+
+Rotas (todas com `Authorization: Bearer <ADMIN_PASSWORD>`):
+
+| Rota | Efeito |
+|---|---|
+| `GET /admin/estado` | `{ admin, versao, pessoas, equipamentos }` |
+| `POST /admin/pessoas` | `{ pessoas: [...] }` → nova versão |
+| `POST /admin/equipamentos` | `{ equipamentos: [...] }` → nova versão |
+| `POST /admin/execucoes/:id/excluir` | apaga a linha da execução |
+
+Adicione ao `/etc/fichas-sync.env`:
+
+```bash
+ADMIN_PASSWORD=uma-senha-longa-do-administrador   # mínimo 8 caracteres
+ADMIN_PORT=8788
+LIST_CONFIG=ConfigFichas
+```
+
+Mesmo arquivo de ambiente, segundo serviço:
+
+```bash
+sudo tee /etc/systemd/system/fichas-admin.service >/dev/null <<'EOF'
+[Unit]
+Description=Fichas Metro admin (cadastros)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=/etc/fichas-sync.env
+ExecStart=/usr/bin/node /home/ricardo/.openclaw/workspace/projects/fichas-metro/server/admin-server.mjs
+Restart=always
+RestartSec=5
+User=ricardo
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload && sudo systemctl enable --now fichas-admin
+```
+
+`admin-server.mjs` recusa subir sem `ADMIN_PASSWORD` de 8+ caracteres e bloqueia
+o IP por 10 minutos após 10 senhas erradas — o Raspberry não é um site público,
+mas também não vale deixar força bruta aberta.
+
+> A senha **não** substitui o nível no app: o RG escolhe quem é administrador na
+> tela; a `ADMIN_PASSWORD` é o que autentica o aparelho junto ao SharePoint.
+
 ## 4. Apontar o app
 
 No app, tela **Backup → Sincronização**, cole o endereço, ex.:
@@ -116,6 +179,13 @@ https://<seu-host-ou-tailscale>:8787/fichas
 ```
 
 Ou fixe no build: `VITE_SYNC_URL=https://host:8787/fichas npm run build`.
+
+O endereço do serviço de administração é derivado do de sync
+(`:8787/fichas` → `:8788`). Se preferir separar, grave
+`localStorage['fichas:adminUrl']` ou compile com `VITE_ADMIN_URL`.
+
+No **Backup → Sincronização** também cabe o token da equipe e a senha de
+administrador: sem eles, o cadastro é salvo só no aparelho e o app avisa.
 
 Sem endereço configurado, o app continua funcionando no modo antigo
 (compartilhar arquivo JSON → Power Automate).
@@ -139,3 +209,8 @@ Sem endereço configurado, o app continua funcionando no modo antigo
 - Exponha o serviço por Tailscale/VPN ou HTTPS com certificado válido. Não deixe
   aberto na internet sem TLS.
 - O segredo do cliente fica só em `/etc/fichas-sync.env` (chmod 600), nunca no app.
+- `SYNC_TOKEN` protege o envio de execuções; `ADMIN_PASSWORD` protege os
+  cadastros e a exclusão. São credenciais diferentes de propósito: o token da
+  equipe vaza fácil (está em cada celular), a senha de administrador não.
+- Sem senha de administrador no aparelho, a tela de Cadastros grava local mas
+  **avisa** que não publicou — nada fica escondido do usuário.

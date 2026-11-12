@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowLeft, CheckCircle2, Clock, Trash2 } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Clock, Trash2, X } from 'lucide-react'
 import { db } from '../lib/db'
 import { getFicha } from '../config/fichas'
 import { avaliarItem, valorExibido } from '../lib/conformidade'
+import { excluirExecucaoNoServidor, obterEndpointAdmin } from '../lib/sync'
 
 interface Props {
   /** só administrador apaga uma execução salva */
@@ -21,11 +22,34 @@ export default function TelaHistorico({ podeExcluir, onVoltar, onAbrir }: Props)
 
   const [confirmando, setConfirmando] = useState<{ id: string; codigo: string } | null>(null)
 
+  const [aviso, setAviso] = useState<{ erro: boolean; texto: string } | null>(null)
+
+  /**
+   * A exclusão é de administrador: o aparelho apaga a cópia local e o serviço de
+   * administração apaga a linha no SharePoint. Sem servidor configurado, apaga
+   * só aqui e avisa — apagar no SharePoint exige a senha guardada lá.
+   */
   const excluir = async (id: string) => {
+    const endpoint = obterEndpointAdmin()
+    if (!endpoint) {
+      setConfirmando(null)
+      setAviso({
+        erro: true,
+        texto: 'Sem serviço de administração configurado: a execução foi apagada só deste aparelho.',
+      })
+      return
+    }
+    const r = await excluirExecucaoNoServidor(endpoint, id)
+    if (!r.ok) {
+      setConfirmando(null)
+      setAviso({ erro: true, texto: `Não foi possível excluir no servidor: ${r.erro}` })
+      return
+    }
     const fotos = await db.fotos.where('execucaoId').equals(id).toArray()
     for (const f of fotos) await db.fotos.delete(f.id)
     await db.execucoes.delete(id)
     setConfirmando(null)
+    setAviso({ erro: false, texto: 'Execução excluída no aparelho e no SharePoint.' })
   }
 
   return (
@@ -43,6 +67,20 @@ export default function TelaHistorico({ podeExcluir, onVoltar, onAbrir }: Props)
       </header>
 
       <div className="space-y-3 p-4">
+        {aviso && (
+          <div
+            className={`flex items-start gap-2 rounded-xl border-2 p-3 text-[11px] font-medium ${
+              aviso.erro
+                ? 'border-amber-300 bg-amber-50 text-amber-900'
+                : 'border-emerald-300 bg-emerald-50 text-emerald-900'
+            }`}
+          >
+            <span className="flex-1">{aviso.texto}</span>
+            <button onClick={() => setAviso(null)} aria-label="Fechar aviso">
+              <X size={14} />
+            </button>
+          </div>
+        )}
         {execucoes?.length === 0 && (
           <p className="rounded-2xl border-2 border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
             Nenhuma execução registrada ainda.

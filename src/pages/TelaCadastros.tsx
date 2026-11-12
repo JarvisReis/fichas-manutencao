@@ -11,7 +11,10 @@ import {
   type NivelAcesso,
   type Pessoa,
 } from '../lib/cadastros'
-import { ShieldCheck, User as UserIcon } from 'lucide-react'
+import { ShieldCheck, User as UserIcon, CloudUpload, CloudOff } from 'lucide-react'
+import { enviarEquipamentos, enviarPessoas } from '../lib/sync'
+import { gravarVersao } from '../lib/cadastros'
+import { obterEndpointAdmin } from '../lib/sync'
 
 interface Props {
   onVoltar: () => void
@@ -35,14 +38,49 @@ export default function TelaCadastros({ onVoltar, administrador }: Props) {
     })()
   }, [])
 
+  /**
+   * Cadastro só conta como salvo quando o servidor confirma. Sem servidor
+   * configurado (ou sem rede) o app grava local e avisa que a equipe não viu.
+   */
+  const [avisoEnvio, setAvisoEnvio] = useState<{ erro: boolean; texto: string } | null>(null)
+
+  const publicar = async (
+    caminho: () => Promise<{ ok: boolean; versao?: number; erro?: string }>,
+    local: () => Promise<void>,
+  ) => {
+    await local()
+    const endpoint = obterEndpointAdmin()
+    if (!endpoint) {
+      setAvisoEnvio({
+        erro: true,
+        texto: 'Salvo só neste aparelho: cadastre o endereço do servidor em Backup → Sincronização.',
+      })
+      return
+    }
+    setAvisoEnvio(null)
+    const r = await caminho()
+    if (r.ok) {
+      if (r.versao) await gravarVersao(r.versao)
+      setAvisoEnvio({ erro: false, texto: `Publicado para a equipe (versão ${r.versao ?? '?'}).` })
+    } else {
+      setAvisoEnvio({ erro: true, texto: `Salvo no aparelho, mas não foi publicado: ${r.erro}` })
+    }
+  }
+
   const salvarPessoas = async (lista: Pessoa[]) => {
     setPessoas(lista)
-    await gravarPessoas(lista)
+    await publicar(
+      () => enviarPessoas(obterEndpointAdmin(), lista),
+      () => gravarPessoas(lista),
+    )
   }
 
   const salvarEquipamentos = async (lista: Equipamento[]) => {
     setEquipamentos(lista)
-    await gravarEquipamentos(lista)
+    await publicar(
+      () => enviarEquipamentos(obterEndpointAdmin(), lista),
+      () => gravarEquipamentos(lista),
+    )
   }
 
   if (!carregado) {
@@ -93,6 +131,25 @@ export default function TelaCadastros({ onVoltar, administrador }: Props) {
       </header>
 
       <div className="p-4">
+        {avisoEnvio && (
+          <div
+            className={`mb-3 flex items-start gap-2 rounded-xl border-2 p-3 text-[11px] font-medium ${
+              avisoEnvio.erro
+                ? 'border-amber-300 bg-amber-50 text-amber-900'
+                : 'border-emerald-300 bg-emerald-50 text-emerald-900'
+            }`}
+          >
+            {avisoEnvio.erro ? (
+              <CloudOff size={14} className="mt-0.5 shrink-0" />
+            ) : (
+              <CloudUpload size={14} className="mt-0.5 shrink-0" />
+            )}
+            <span className="flex-1">{avisoEnvio.texto}</span>
+            <button onClick={() => setAvisoEnvio(null)} aria-label="Fechar aviso">
+              <X size={14} />
+            </button>
+          </div>
+        )}
         {aba === 'equipe' ? (
           <EditorPessoas pessoas={pessoas} onSalvar={salvarPessoas} />
         ) : (

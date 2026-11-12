@@ -36,6 +36,25 @@ export function lerEndpointSync(): string {
   return (import.meta.env.VITE_SYNC_URL as string | undefined)?.trim() ?? ''
 }
 
+/**
+ * Endpoint do serviço de administração (cadastros com senha). Vive na mesma
+ * máquina do sync, porta 8788: `http://<host>:8787/fichas` → `http://<host>:8788`.
+ * `localStorage['fichas:adminUrl']` sobrescreve; sem endereço, o cadastro fica
+ * só no aparelho (e o app avisa).
+ */
+export function obterEndpointAdmin(): string {
+  try {
+    const salvo = localStorage.getItem('fichas:adminUrl')
+    if (salvo && salvo.trim()) return salvo.trim().replace(/\/$/, '')
+    const sync = lerEndpointSync()
+    if (sync) return sync.replace(/\/fichas\/?$/, '').replace(/:8787\b/, ':8788').replace(/\/$/, '')
+  } catch {
+    /* localStorage indisponível */
+  }
+  const build = (import.meta.env.VITE_ADMIN_URL as string | undefined)?.trim()
+  return build ? build.replace(/\/$/, '') : ''
+}
+
 /** Memória de campos fixos por ficha (torquímetro, RGs, séries). */
 export async function lerCamposFixos(fichaId: string): Promise<Record<string, string>> {
   const registro = await db.config.get(`camposFixos:${fichaId}`)

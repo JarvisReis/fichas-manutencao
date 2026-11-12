@@ -1,4 +1,5 @@
 import { db } from './db'
+export { obterEndpointAdmin } from './db'
 import { getFicha } from '../config/fichas'
 import { avaliarItem, limiteExibido } from './conformidade'
 import type { DefinicaoFicha, Marca } from '../types'
@@ -239,3 +240,56 @@ function detectarAparelho(): string {
   if (/Android/.test(ua)) return 'Android'
   return 'Navegador'
 }
+
+/* ------------------------- administração (cadastros) ----------------------- */
+
+/**
+ * Cadastros e exclusão de execução só passam pelo serviço de administração, com
+ * senha. O app não envia cadastro pelo endpoint comum: assim um aparelho
+ * comprometido não altera a equipe nem apaga histórico no SharePoint.
+ */
+function cabecalhosAdmin(): Record<string, string> {
+  const base: Record<string, string> = { 'Content-Type': 'application/json' }
+  try {
+    const token = localStorage.getItem('fichas:syncToken')
+    if (token && token.trim()) base.Authorization = `Bearer ***)}`
+  } catch {
+    /* localStorage indisponível */
+  }
+  return base
+}
+
+export interface RespostaAdmin {
+  ok: boolean
+  versao?: number
+  erro?: string
+}
+
+async function postAdmin(
+  endpoint: string,
+  caminho: string,
+  corpo: unknown,
+): Promise<RespostaAdmin> {
+  const base = endpoint.replace(/\/$/, '')
+  try {
+    const r = await fetch(`${base}${caminho}`, {
+      method: 'POST',
+      headers: cabecalhosAdmin(),
+      body: JSON.stringify(corpo),
+    })
+    const dados = (await r.json().catch(() => ({}))) as RespostaAdmin & { erro?: string }
+    if (!r.ok) return { ok: false, erro: dados.erro ?? `HTTP ${r.status}` }
+    return { ok: true, versao: dados.versao }
+  } catch (e) {
+    return { ok: false, erro: `Sem conexão com ${base}: ${(e as Error).message}` }
+  }
+}
+
+export const enviarPessoas = (endpoint: string, pessoas: unknown[]) =>
+  postAdmin(endpoint, '/admin/pessoas', { pessoas })
+
+export const enviarEquipamentos = (endpoint: string, equipamentos: unknown[]) =>
+  postAdmin(endpoint, '/admin/equipamentos', { equipamentos })
+
+export const excluirExecucaoNoServidor = (endpoint: string, execucaoId: string) =>
+  postAdmin(endpoint, `/admin/execucoes/${encodeURIComponent(execucaoId)}/excluir`, {})
