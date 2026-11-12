@@ -424,6 +424,23 @@ export default function TelaHome({
                           {ficha ? ficha.nomeCurto.toUpperCase() : 'FICHA NÃO DEFINIDA'}
                         </span>
                         <UltimaManutencao exec={ultimaPorEquipamento.get(equip.nome)} />
+                        {(() => {
+                          const ultima = ultimaPorEquipamento.get(equip.nome)
+                          if (!ultima) return null
+                          const quando = new Date(ultima.dataHora).toLocaleString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: '2-digit',
+                          })
+                          return (
+                            <>
+                              <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">
+                                {ultima.tipoManutencao ?? '—'}
+                              </span>
+                              <span className="text-[11px] text-slate-600">{quando}</span>
+                            </>
+                          )
+                        })()}
                         {naoEnviadas.has(equip.nome.trim()) && (
                           <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-500">
                             NÃO ENVIADO
@@ -582,29 +599,18 @@ function UltimaManutencao({ exec }: { exec: Execucao | undefined }) {
       </span>
     )
   }
-  const quando = new Date(exec.dataHora).toLocaleString('pt-BR', {
-    day: '2-digit',
-    month: '2-digit',
-    year: '2-digit',
-  })
   return (
-    <>
-      <span
-        className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${
-          exec.status === 'pendente'
-            ? 'bg-red-100 text-red-800'
-            : 'bg-emerald-100 text-emerald-800'
-        }`}
-      >
-        {exec.status === 'pendente' ? 'PENDENTE' : 'CONCLUÍDA'}
-      </span>
-      <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">
-        {exec.tipoManutencao ?? '—'}
-      </span>
-      <span className="text-[11px] text-slate-600">{quando}</span>
-    </>
+    <span
+      className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${
+        exec.status === 'pendente' ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'
+      }`}
+    >
+      {exec.status === 'pendente' ? 'PENDENTE' : 'CONCLUÍDA'}
+    </span>
   )
 }
+
+
 
 /** Item do menu suspenso do cabeçalho. */
 function MenuItem({
