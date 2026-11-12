@@ -1,11 +1,13 @@
+import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { AlertTriangle, ChevronRight, ClipboardList, CloudOff, Database, HardDriveDownload, Moon, Plus, Sun, Users, Wifi } from 'lucide-react'
-import type { DefinicaoFicha } from '../types'
+import { AlertTriangle, ChevronRight, CloudOff, Database, HardDriveDownload, Moon, Search, Sun, Users, Wifi, X } from 'lucide-react'
 import { db } from '../lib/db'
 import { FICHAS } from '../config/fichas'
+import { lerEquipamentos, normalizar, type Equipamento } from '../lib/cadastros'
 
 interface Props {
-  onNovaExecucao: (ficha: DefinicaoFicha) => void
+  /** Abre a execução já com a ficha definida pelo cadastro do contator. */
+  onNovaExecucaoDoEquipamento: (equipamento: Equipamento) => void
   onAbrirExecucao: (id: string) => void
   onVerHistorico: () => void
   onVerBackup: () => void
@@ -16,7 +18,7 @@ interface Props {
 }
 
 export default function TelaHome({
-  onNovaExecucao,
+  onNovaExecucaoDoEquipamento,
   onAbrirExecucao,
   onVerHistorico,
   onVerBackup,
@@ -33,6 +35,31 @@ export default function TelaHome({
   )
 
   const naoSincronizadas = pendentes?.length ?? 0
+
+  const [busca, setBusca] = useState('')
+  const [equipamentos, setEquipamentos] = useState<Equipamento[]>([])
+
+  // Cadastros podem ser editados em outra tela: recarrega ao abrir e ao voltar.
+  useEffect(() => {
+    const carregar = () => void lerEquipamentos().then(setEquipamentos)
+    carregar()
+    const aoVoltar = () => {
+      if (document.visibilityState === 'visible') carregar()
+    }
+    document.addEventListener('visibilitychange', aoVoltar)
+    return () => document.removeEventListener('visibilitychange', aoVoltar)
+  }, [])
+
+  const filtrados = useMemo(() => {
+    const termo = normalizar(busca)
+    return equipamentos
+      .filter((e) => {
+        if (!termo) return true
+        const alvo = normalizar(`${e.nome} ${e.local} ${e.marca ?? ''} ${e.serie ?? ''}`)
+        return termo.split(/\s+/).every((parte) => alvo.includes(parte))
+      })
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  }, [equipamentos, busca])
 
   return (
     <div className="min-h-full pb-10">
@@ -69,26 +96,72 @@ export default function TelaHome({
       <div className="space-y-5 p-4">
         <section>
           <h2 className="mb-2 px-1 text-xs font-bold tracking-wide text-slate-500 uppercase">
-            Nova execução
+            Novo serviço
           </h2>
-          <div className="space-y-2">
-            {FICHAS.map((ficha) => (
-              <button
-                key={ficha.id}
-                onClick={() => onNovaExecucao(ficha)}
-                className="flex w-full items-center gap-3 rounded-2xl border-2 border-slate-200 bg-white p-4 text-left shadow-sm active:scale-[0.995] active:bg-slate-50"
-              >
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
-                  <ClipboardList size={22} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold text-slate-900">{ficha.nomeCurto}</span>
-                  <span className="block text-xs text-slate-500">{ficha.subtitulo}</span>
-                </span>
-                <Plus size={18} className="shrink-0 text-blue-700" />
+          <p className="mb-2 px-1 text-xs text-slate-500">
+            Escolha o contator — a ficha vem do que está cadastrado nele.
+          </p>
+
+          <div className="mb-2 flex items-center gap-2 rounded-xl border-2 border-slate-200 bg-white px-3 py-2.5">
+            <Search size={16} className="shrink-0 text-slate-400" />
+            <input
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar por nome, local, marca ou série"
+              className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+            />
+            {busca && (
+              <button type="button" onClick={() => setBusca('')} aria-label="Limpar busca">
+                <X size={16} className="text-slate-400" />
               </button>
-            ))}
+            )}
           </div>
+
+          {equipamentos.length === 0 ? (
+            <div className="rounded-2xl border-2 border-dashed border-slate-300 p-4">
+              <p className="text-xs text-slate-600">
+                Nenhum contator cadastrado. Cadastre em <strong>Cadastros</strong> — a ficha de cada
+                serviço passa a ser escolhida automaticamente pelo equipamento.
+              </p>
+              <button
+                onClick={onVerCadastros}
+                className="mt-2 w-full rounded-lg bg-slate-100 py-2 text-xs font-semibold text-slate-700"
+              >
+                Abrir cadastros
+              </button>
+            </div>
+          ) : filtrados.length === 0 ? (
+            <p className="rounded-xl bg-slate-100 p-3 text-xs text-slate-600">
+              Nenhum contator encontrado para "{busca}".
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {filtrados.map((equip) => {
+                const ficha = FICHAS.find((f) => f.id === equip.fichaId)
+                return (
+                  <button
+                    key={equip.id}
+                    onClick={() => onNovaExecucaoDoEquipamento(equip)}
+                    className="flex w-full items-center gap-3 rounded-2xl border-2 border-slate-200 bg-white p-3.5 text-left shadow-sm active:scale-[0.995] active:bg-slate-50"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-slate-900">
+                        {equip.nome}
+                      </span>
+                      <span className="block truncate text-xs text-slate-500">
+                        {[equip.local, equip.marca, equip.serie].filter(Boolean).join(' · ') ||
+                          'sem detalhes'}
+                      </span>
+                      <span className="mt-0.5 block text-[11px] font-medium text-blue-700">
+                        {ficha ? ficha.nomeCurto : 'ficha não definida'}
+                      </span>
+                    </span>
+                    <ChevronRight size={18} className="shrink-0 text-slate-400" />
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </section>
 
         {ultimas && ultimas.length > 0 && (

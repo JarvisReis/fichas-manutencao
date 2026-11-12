@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { DefinicaoFicha, Execucao } from './types'
 import { db, gerarCodigo } from './lib/db'
 import { getFicha } from './config/fichas'
+import type { Equipamento } from './lib/cadastros'
 import TelaHome from './pages/TelaHome'
 import TelaIdentificacao from './pages/TelaIdentificacao'
 import TelaExecucao from './pages/TelaExecucao'
@@ -49,7 +50,13 @@ export default function App() {
     [],
   )
 
-  const novaExecucao = async (ficha: DefinicaoFicha) => {
+  /**
+   * Abre uma execução a partir do contator escolhido: a ficha e o local vêm do
+   * cadastro do equipamento, não de uma escolha manual.
+   */
+  const novaExecucaoDoEquipamento = async (equipamento: Equipamento) => {
+    const ficha = getFicha(equipamento.fichaId)
+    if (!ficha) return
     const existentes = await db.execucoes.toArray()
     const agora = new Date()
     const execucao: Execucao = {
@@ -57,8 +64,8 @@ export default function App() {
       codigo: gerarCodigo(ficha.prefixo, existentes),
       fichaId: ficha.id,
       cabecalho: {},
-      camposFixos: {},
-      local: '',
+      camposFixos: { equipamento: equipamento.nome },
+      local: equipamento.local ?? '',
       dataHora: agora.toISOString(),
       valores: ficha.itens.map((item) => ({ itemId: item.id, valor: '' })),
       status: 'rascunho',
@@ -162,7 +169,7 @@ export default function App() {
       return (
         <TelaHome
           online={online}
-          onNovaExecucao={(ficha) => void novaExecucao(ficha)}
+          onNovaExecucaoDoEquipamento={(equip) => void novaExecucaoDoEquipamento(equip)}
           onAbrirExecucao={(id) => void abrirExecucao(id)}
           onVerHistorico={() => setRota({ nome: 'historico' })}
           onVerBackup={() => setRota({ nome: 'backup' })}
