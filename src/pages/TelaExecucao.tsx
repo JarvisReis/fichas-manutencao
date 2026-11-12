@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Camera, Check, Infinity as Inf, Plus, Save, Trash2, X } from 'lucide-react'
 import type { DefinicaoFicha, Execucao, Foto, Marca, ValorItem } from '../types'
 import { avaliarItem } from '../lib/conformidade'
@@ -43,6 +43,28 @@ export default function TelaExecucao({
   const [aviso, setAviso] = useState<string | null>(null)
 
   const marca = execucao.marca
+
+  /*
+   * Ordem de preenchimento no teclado. Alguns teclados numéricos de Android
+   * (o de campo, com vírgula e sinal) não têm tecla "próximo" — o técnico fica
+   * preso no campo. Cada input guarda sua posição e o "Próximo" do teclado leva
+   * para o seguinte, na mesma ordem em que os itens aparecem na ficha.
+   */
+  const camposRef = useRef<(HTMLInputElement | null)[]>([])
+
+  const focarCampo = (posicao: number) => {
+    const campos = camposRef.current
+    for (let i = posicao; i < campos.length; i++) {
+      const alvo = campos[i]
+      if (alvo && !alvo.disabled && !alvo.readOnly) {
+        alvo.focus()
+        alvo.select()
+        return
+      }
+    }
+    // último campo: fecha o teclado em vez de deixar preso
+    campos[posicao]?.blur()
+  }
 
   // Carrega URLs de preview das fotos já salvas
   useEffect(() => {
@@ -136,6 +158,11 @@ export default function TelaExecucao({
   const foraDoLimite = analises.filter((a) => a.analise.resultado === 'nao_conforme')
   const pendentes = analises.filter((a) => a.analise.resultado === 'vazio').length
 
+  // Itens com campo de medição, na ordem da tela. Itens N/A (marca) não contam
+  // na sequência do teclado — nenhum campo deles recebe foco.
+  const comCampo = analises.filter((a) => a.analise.resultado !== 'na').map((a) => a.item.id)
+  const totalMedicoes = comCampo.length
+
   const tirarFotoObservacao = async (arquivo: File | undefined | null) => {
     if (!arquivo) return
     setCarregandoFoto('observacao')
@@ -219,6 +246,7 @@ export default function TelaExecucao({
           const analise = avaliarItem(item, valorDe(item.id), marca)
           const cores = corResultado[analise.resultado]
           const fotoUrl = fotos[item.id]
+          const posicao = comCampo.indexOf(item.id)
 
           return (
             <section
@@ -249,10 +277,22 @@ export default function TelaExecucao({
                   <div className="flex items-stretch gap-2">
                     <div className="relative flex-1">
                       <input
+                        ref={(el) => {
+                          if (posicao >= 0) camposRef.current[posicao] = el
+                        }}
                         type="text"
                         inputMode="decimal"
+                        enterKeyHint={posicao === totalMedicoes - 1 ? 'done' : 'next'}
+                        autoComplete="off"
                         value={valorDe(item.id)}
                         onChange={(e) => definirValor(item.id, e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            focarCampo(posicao + 1)
+                          }
+                        }}
+                        readOnly={!podeAlterar}
                         placeholder="0"
                         className="input-medida w-full rounded-xl border-2 border-slate-300 bg-white px-3 py-3 pr-14 text-slate-900 outline-none focus:border-blue-600"
                       />
