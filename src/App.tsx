@@ -61,6 +61,19 @@ export default function App() {
   const { tema, alternar } = useTema()
   const { sessao, entrar, sair, ehAdministrador } = useSessao()
 
+  // Quantas pessoas existem no cadastro. Com zero, o administrador ainda não
+  // existe e o app precisa abrir a tela de cadastros — senão nasce trancado.
+  const [totalPessoas, setTotalPessoas] = useState<number | null>(null)
+  useEffect(() => {
+    const contar = () => void lerPessoas().then((l) => setTotalPessoas(l.length))
+    contar()
+    const aoVoltar = () => {
+      if (document.visibilityState === 'visible') contar()
+    }
+    document.addEventListener('visibilitychange', aoVoltar)
+    return () => document.removeEventListener('visibilitychange', aoVoltar)
+  }, [rota])
+
   useEffect(() => {
     const on = () => setOnline(true)
     const off = () => setOnline(false)
@@ -253,9 +266,12 @@ export default function App() {
         />
       )
 
-    case 'cadastros':
+    case 'cadastros': {
       // Sem sessão de administrador a tela não abre — nem por rota antiga.
-      if (!ehAdministrador) {
+      // Exceção: aparelho sem nenhuma pessoa cadastrada. Aí o administrador
+      // ainda não existe e, sem esta saída, o app nasce trancado.
+      const semNinguem = !ehAdministrador && totalPessoas === 0
+      if (!ehAdministrador && !semNinguem) {
         return (
           <TelaHome
             online={online}
@@ -279,6 +295,7 @@ export default function App() {
           onVoltar={() => setRota({ nome: 'home' })}
         />
       )
+    }
 
     case 'backup':
       return (
