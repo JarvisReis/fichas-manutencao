@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Camera, Check, Infinity as Inf, Save, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Camera, Check, Infinity as Inf, Plus, Save, Trash2, X } from 'lucide-react'
 import type { DefinicaoFicha, Execucao, Foto, Marca, ValorItem } from '../types'
 import { avaliarItem } from '../lib/conformidade'
 import { comprimirImagem, db } from '../lib/db'
@@ -12,6 +12,8 @@ interface Props {
   onVoltar: () => void
   onSalvar: (status: 'rascunho' | 'concluida') => void
   onAtualizar: (patch: Partial<Execucao>) => void
+  /** ficha salva em modo leitura: abre uma manutenção nova do mesmo equipamento */
+  onNovaManutencao?: () => void
 }
 
 /** Marcador da foto única anexada à observação final da execução. */
@@ -31,6 +33,7 @@ export default function TelaExecucao({
   onVoltar,
   onSalvar,
   onAtualizar,
+  onNovaManutencao,
 }: Props) {
   const [valores, setValores] = useState<ValorItem[]>(execucao.valores)
   const [obsGeral, setObsGeral] = useState(execucao.observacaoGeral ?? '')
@@ -390,9 +393,19 @@ export default function TelaExecucao({
 
       <footer className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 p-3 backdrop-blur">
         {!podeAlterar ? (
-          <p className="rounded-xl bg-slate-100 px-3 py-3 text-center text-xs font-semibold text-slate-600">
-            Ficha concluída — somente leitura.
-          </p>
+          <div className="space-y-2">
+            <p className="rounded-xl bg-slate-100 px-3 py-2 text-center text-xs font-semibold text-slate-600">
+              Ficha concluída — somente leitura.
+            </p>
+            {onNovaManutencao && (
+              <button
+                onClick={onNovaManutencao}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 py-3 text-sm font-semibold text-white active:bg-blue-800"
+              >
+                <Plus size={18} /> Nova manutenção deste equipamento
+              </button>
+            )}
+          </div>
         ) : (
         <div className="flex gap-2">
           <button

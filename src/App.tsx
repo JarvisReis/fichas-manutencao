@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Plus } from 'lucide-react'
 import type { DefinicaoFicha, Execucao } from './types'
 import { db, gerarCodigo } from './lib/db'
 import { getFicha } from './config/fichas'
-import { lerPessoas, type Equipamento } from './lib/cadastros'
+import { lerEquipamentos, lerPessoas, type Equipamento } from './lib/cadastros'
 import { podeEditarExecucao } from './lib/permissoes'
 import { useSessao } from './lib/sessao'
 import TelaHome from './pages/TelaHome'
@@ -20,7 +21,8 @@ type Rota =
   | { nome: 'historico' }
   | { nome: 'backup' }
   | { nome: 'cadastros' }
-  | { nome: 'salvo'; execucao: Execucao }
+  | { nome: 'ficha'; ficha: DefinicaoFicha; execucao: Execucao; equipamento: Equipamento | null }
+  | { nome: 'salvo'; execucao: Execucao; equipamento: Equipamento | null }
 
 export default function App() {
   const [rota, setRota] = useState<Rota>({ nome: 'home' })
@@ -106,13 +108,31 @@ export default function App() {
     setRota({ nome: 'execucao', ficha, execucao })
   }
 
+  /** Equipamento cadastrado correspondente ao nome gravado na execução. */
+  const equipamentoDaExecucao = async (execucao: Execucao): Promise<Equipamento | null> => {
+    const nome = (execucao.camposFixos.equipamento ?? '').trim()
+    const lista = await lerEquipamentos()
+    const achado = lista.find((e) => e.nome.trim() === nome)
+    if (achado) return achado
+    // equipamento digitado à mão (não cadastrado): reaproveita a ficha e o local
+    const ficha = getFicha(execucao.fichaId)
+    if (!ficha || !nome) return null
+    return {
+      id: `avulso:${nome}`,
+      nome,
+      local: execucao.local,
+      fichaId: ficha.id,
+    } as Equipamento
+  }
+
   const salvarExecucao = async (id: string, status: 'rascunho' | 'concluida') => {
     const execucao = await db.execucoes.get(id)
     if (!execucao) return
     const atualizada: Execucao = { ...execucao, status, atualizadaEm: new Date().toISOString() }
     await db.execucoes.put(atualizada)
     if (status === 'concluida') {
-      setRota({ nome: 'salvo', execucao: atualizada })
+      const equipamento = await equipamentoDaExecucao(atualizada)
+      setRota({ nome: 'salvo', execucao: atualizada, equipamento })
     } else {
       setRota({ nome: 'home' })
     }
@@ -188,6 +208,31 @@ export default function App() {
         />
       )
 
+    case 'ficha':
+      if (!rota.equipamento) {
+        return (
+          <TelaHistorico
+            podeExcluir={ehAdministrador}
+            sessao={sessao}
+            onVoltar={() => setRota({ nome: 'home' })}
+            onAbrir={(id) => void abrirExecucao(id)}
+          />
+        )
+      }
+      return (
+        <TelaExecucao
+          ficha={rota.ficha}
+          execucao={rota.execucao}
+          podeAlterar={false}
+          onVoltar={() => setRota({ nome: 'historico' })}
+          onAtualizar={(patch) => atualizarExecucao(rota.execucao.id, patch)}
+          onSalvar={() => undefined}
+          onNovaManutencao={
+            rota.equipamento ? () => void novaExecucaoDoEquipamento(rota.equipamento!) : undefined
+          }
+        />
+      )
+
     case 'salvo':
       return (
         <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-8 text-center">
@@ -199,15 +244,23 @@ export default function App() {
             {rota.execucao.codigo} foi salva no aparelho e ficará na fila até sincronizar com o
             SharePoint.
           </p>
+          {rota.equipamento && (
+            <button
+              onClick={() => void novaExecucaoDoEquipamento(rota.equipamento!)}
+              className="mt-2 flex w-full max-w-xs items-center justify-center gap-2 rounded-xl bg-blue-700 py-3.5 text-sm font-semibold text-white active:bg-blue-800"
+            >
+              <Plus size={18} /> Nova manutenção deste equipamento
+            </button>
+          )}
           <button
             onClick={() => setRota({ nome: 'home' })}
-            className="mt-2 w-full max-w-xs rounded-xl bg-blue-700 py-3.5 text-sm font-semibold text-white active:bg-blue-800"
+            className="w-full max-w-xs rounded-xl border-2 border-slate-300 py-3 text-sm font-semibold text-slate-700"
           >
             Voltar ao início
           </button>
           <button
             onClick={() => setRota({ nome: 'historico' })}
-            className="w-full max-w-xs rounded-xl border-2 border-slate-300 py-3 text-sm font-semibold text-slate-700"
+            className="w-full max-w-xs rounded-xl py-3 text-sm font-semibold text-blue-700"
           >
             Ver histórico
           </button>
