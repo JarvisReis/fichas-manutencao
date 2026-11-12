@@ -6,7 +6,7 @@ import type { DefinicaoFicha, Marca } from '../types'
 export type ResultadoExportado = 'conforme' | 'nao_conforme' | 'na'
 
 export interface PacoteBackup {
-  formato: 'fichas-metro-backup'
+  formato: 'fichas-backup'
   versao: 1
   exportadoEm: string
   aparelho: string
@@ -56,7 +56,7 @@ export async function montarBackup(): Promise<PacoteBackup> {
   }
 
   return {
-    formato: 'fichas-metro-backup',
+    formato: 'fichas-backup',
     versao: 1,
     exportadoEm: new Date().toISOString(),
     aparelho: detectarAparelho(),
@@ -103,7 +103,7 @@ export async function montarPacoteExecucao(execucaoId: string): Promise<PacoteBa
   }
 
   return {
-    formato: 'fichas-metro-backup',
+    formato: 'fichas-backup',
     versao: 1,
     exportadoEm: new Date().toISOString(),
     aparelho: detectarAparelho(),
@@ -140,7 +140,7 @@ function nomeDoArquivo(codigo: string, dataHora: string): string {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^A-Za-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
-  return `FICHAS-METRO_${limpo}_${dataHora.slice(0, 10)}.json`
+  return `FICHAS_${limpo}_${dataHora.slice(0, 10)}.json`
 }
 
 /** Exporta uma execucao sozinha, com nome de arquivo rastreavel. */
@@ -181,7 +181,7 @@ export async function exportarBackup(): Promise<{ execucoes: number; fotos: numb
   const json = JSON.stringify(pacote, null, 2)
   const blob = new Blob([json], { type: 'application/json' })
 
-  const nome = `fichas-metro-backup-${new Date().toISOString().slice(0, 10)}.json`
+  const nome = `fichas-backup-${new Date().toISOString().slice(0, 10)}.json`
   baixarBlob(blob, nome)
 
   return { execucoes: pacote.execucoes.length, fotos: pacote.fotos.length, bytes: blob.size }
@@ -191,13 +191,13 @@ export async function exportarBackup(): Promise<{ execucoes: number; fotos: numb
 export async function compartilharBackup(): Promise<boolean> {
   const pacote = await montarBackup()
   const json = JSON.stringify(pacote, null, 2)
-  const nome = `fichas-metro-backup-${new Date().toISOString().slice(0, 10)}.json`
+  const nome = `fichas-backup-${new Date().toISOString().slice(0, 10)}.json`
   const arquivo = new File([json], nome, { type: 'application/json' })
 
   if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [arquivo] })) {
     await navigator.share({
       files: [arquivo],
-      title: 'Backup Fichas Metrô',
+      title: 'Backup das fichas',
       text: `${pacote.execucoes.length} execução(ões) · ${pacote.fotos.length} foto(s)`,
     })
     return true
@@ -212,8 +212,8 @@ export async function importarBackup(texto: string): Promise<{
   ignoradas: number
 }> {
   const pacote = JSON.parse(texto) as PacoteBackup
-  if (pacote.formato !== 'fichas-metro-backup') {
-    throw new Error('Arquivo não é um backup do Fichas Metrô.')
+  if (pacote.formato !== 'fichas-backup') {
+    throw new Error('Arquivo não é um backup das fichas.')
   }
 
   let importadas = 0

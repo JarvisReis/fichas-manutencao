@@ -15,7 +15,7 @@ export function grupoDaFicha(fichaId: string): string {
 }
 
 /**
- * Definições das fichas de campo do Metrô.
+ * Definições das fichas de campo.
  *
  * Cada ficha aqui é transcrição do formulário em papel — os limites, unidades e
  * instrumentos vêm da ficha modelo original. Adicionar um novo tipo de

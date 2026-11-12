@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Posto de administração das Fichas Metrô.
+ * Posto de administração das fichas.
  *
  * O servidor de sync aceita execuções de qualquer aparelho com o token comum da
  * equipe. Cadastros (pessoas e equipamentos) e exclusão de execução NÃO são

@@ -201,7 +201,7 @@ export default function TelaHome({
     <div className="min-h-full pb-10">
       <header className="relative bg-gradient-to-br from-blue-800 to-blue-600 px-5 pt-8 pb-7 text-white">
         <div className="mb-1 flex items-center justify-between">
-          <p className="text-xs font-medium tracking-wide text-blue-100 uppercase">Metrô · Manutenção</p>
+          <p className="text-xs font-medium tracking-wide text-blue-100 uppercase">Manutenção · Fichas</p>
           <div className="flex items-center gap-2">
           <span
             className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold ${

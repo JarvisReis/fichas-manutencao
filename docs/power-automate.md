@@ -59,9 +59,9 @@ Power Automate → **Criar** → **Fluxo automatizado** → gatilho **"Quando um
 - Esquema: use **"Usar exemplo de payload"** e cole o arquivo `docs/exemplo-execucao.json` deste diretório. O Power Automate gera o schema sozinho.
 
 ### Ação 3 — Condição
-`formato` **é igual a** `fichas-metro-backup`
+`formato` **é igual a** `fichas-backup`
 
-Se não for, adicione **Encerrar** com status `Failed` e mensagem "arquivo não é do Fichas Metrô".
+Se não for, adicione **Encerrar** com status `Failed` e mensagem "arquivo não é um backup das fichas".
 
 ### Ação 4 — Aplicar a cada (loop)
 Entrada: `execucoes` (saída do Parse JSON)

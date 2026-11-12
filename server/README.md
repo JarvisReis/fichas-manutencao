@@ -1,10 +1,10 @@
 # Serviço de sincronização (fichas-sync)
 
-Proxy Node.js que recebe as execuções do app **Fichas Metrô** e grava nas listas do
+Proxy Node.js que recebe as execuções do app **Fichas de Medição** e grava nas listas do
 SharePoint via **Microsoft Graph** com credenciais de aplicativo — sem ninguém
 logado, sem Power Automate.
 
-- `POST /fichas` — recebe **uma** execução (formato `fichas-metro-execucao`, v2) e
+- `POST /fichas` — recebe **uma** execução (formato `fichas-execucao`, v2) e
   cria um item em `FichasExecucoes`. Idempotente por `ExecucaoId`.
   Em P2, atualiza também `NucleoInstalado` do contator na lista `Contatores`.
 - `GET /fichas?equipamento=<nome>` — devolve o núcleo instalado atual daquele
@@ -14,7 +14,7 @@ logado, sem Power Automate.
 ## 1. Preparar o app no Entra ID
 
 1. Entra ID → **Registros de aplicativo** → **Novo registro**
-   - Nome: `Fichas Metrô Sync`
+   - Nome: `Fichas Sync`
    - Contas: **somente este locatário**
    - Sem URI de redirecionamento
 2. **Certificados e segredos** → novo segredo do cliente → copie o **valor** (aparece uma vez).
@@ -26,7 +26,7 @@ logado, sem Power Automate.
 Connect-MgGraph -Scopes "Sites.Selected.ReadWrite.All"
 $site = Get-MgSite -SiteId "metrosp.sharepoint.com:/sites/Fichas"
 New-MgSitePermission -SiteId $site.Id -Roles @("write") -GrantedToIdentities @(
-  @{ Application = @{ Id = "<CLIENT_ID>"; DisplayName = "Fichas Metrô Sync" } }
+  @{ Application = @{ Id = "<CLIENT_ID>"; DisplayName = "Fichas Sync" } }
 )
 ```
 

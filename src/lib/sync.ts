@@ -14,7 +14,7 @@ import type { DefinicaoFicha, Marca } from '../types'
  */
 export type ResultadoExportado = 'conforme' | 'nao_conforme' | 'na'
 
-export const FORMATO_ENVIO = 'fichas-metro-execucao'
+export const FORMATO_ENVIO = 'fichas-execucao'
 export const VERSAO_ENVIO = 2
 
 export interface FotoExportada {

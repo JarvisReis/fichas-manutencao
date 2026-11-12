@@ -14,7 +14,7 @@ export default defineConfig({
       injectRegister: 'inline',
       includeAssets: ['favicon.svg', 'icon-192.png', 'icon-512.png'],
       manifest: {
-        name: 'Fichas Metrô',
+        name: 'Fichas de Medição',
         short_name: 'Fichas',
         description: 'Fichas de medição de contator e seccionador — uso em campo, offline',
         theme_color: '#0b3d91',

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Serviço de sincronização das Fichas Metrô.
+ * Serviço de sincronização das fichas.
  *
- * Recebe POST /fichas com UMA execução (formato `fichas-metro-execucao` v2),
+ * Recebe POST /fichas com UMA execução (formato `fichas-execucao` v2),
  * grava nas listas do SharePoint via Graph API usando as credenciais da
  * App Registration (client credentials + Sites.Selected — sem usuário logado).
  *
@@ -245,7 +245,7 @@ const servidor = http.createServer(async (req, res) => {
       for await (const parte of req) partes.push(parte)
       const payload = JSON.parse(Buffer.concat(partes).toString('utf8'))
 
-      if (payload.formato !== 'fichas-metro-execucao') {
+      if (payload.formato !== 'fichas-execucao') {
         return json(res, 400, { erro: 'formato não reconhecido' })
       }
       if (!payload.id) return json(res, 400, { erro: 'execução sem id' })

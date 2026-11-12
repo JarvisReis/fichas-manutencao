@@ -11,6 +11,8 @@ export class FichasDB extends Dexie {
   config!: Table<{ chave: string; valor: string }, string>
 
   constructor() {
+    // Nome do banco no IndexedDB. Mantido como está de propósito: renomear
+    // criaria um banco novo e vazio, e o técnico perderia as fichas locais.
     super('fichas-metro')
     this.version(1).stores({
       execucoes: 'id, codigo, fichaId, status, sincronizada, criadaEm, dataHora, atualizadaEm',
