@@ -11,7 +11,7 @@ interface Props {
   /** rascunho é de quem executa; concluída só administrador reabre */
   podeAlterar: boolean
   onVoltar: () => void
-  onSalvar: (status: 'rascunho' | 'concluida') => void
+  onSalvar: (status: 'rascunho' | 'concluida' | 'pendente') => void
   onAtualizar: (patch: Partial<Execucao>) => void
   /** ficha salva em modo leitura: abre uma manutenção nova do mesmo equipamento */
   onNovaManutencao?: () => void
@@ -259,7 +259,9 @@ export default function TelaExecucao({
       return
     }
     setAviso(null)
-    onSalvar('concluida')
+    // Medição fora de faixa não impede salvar: em campo o técnico não pode
+    // ficar travado por um valor ruim. A ficha é salva e marcada como pendente.
+    onSalvar(foraDoLimite.length > 0 ? 'pendente' : 'concluida')
   }
 
   return (
@@ -603,7 +605,7 @@ export default function TelaExecucao({
             onClick={concluir}
             className="flex flex-[2] items-center justify-center gap-2 rounded-xl bg-blue-700 py-3 text-sm font-semibold text-white active:bg-blue-800"
           >
-            <Check size={18} /> Concluir
+            <Check size={18} /> {foraDoLimite.length > 0 ? 'Salvar como pendente' : 'Concluir'}
           </button>
         </div>
         )}

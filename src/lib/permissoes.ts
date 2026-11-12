@@ -12,7 +12,8 @@ export type PodeEditar =
   | { pode: false; motivo: 'fechada' }
 
 export interface ExecucaoMinima {
-  status: 'rascunho' | 'concluida'
+  /** `pendente` conta como ficha fechada: mesmo fluxo de correção da concluída. */
+  status: 'rascunho' | 'concluida' | 'pendente'
   atualizadaEm: string
 }
 

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
+  AlertTriangle,
   ArrowLeft,
   CheckCircle2,
   Clock,
@@ -234,11 +235,17 @@ export default function TelaHistorico({
                     {fora} fora do limite
                   </span>
                 )}
-                {exec.status === "concluida" ? (
+                {exec.status === "concluida" && (
                   <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-700">
                     <CheckCircle2 size={11} /> concluída
                   </span>
-                ) : (
+                )}
+                {exec.status === "pendente" && (
+                  <span className="flex items-center gap-1 rounded-full bg-red-600 px-2.5 py-1 font-bold text-white">
+                    <AlertTriangle size={11} /> pendente
+                  </span>
+                )}
+                {exec.status === "rascunho" && (
                   <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-amber-700">
                     <Clock size={11} /> rascunho
                   </span>
@@ -286,7 +293,7 @@ export default function TelaHistorico({
               )}
 
               {(() => {
-                const concluida = exec.status === "concluida";
+                const concluida = exec.status !== "rascunho";
                 const permissao = podeEditarExecucao(
                   exec,
                   sessao,

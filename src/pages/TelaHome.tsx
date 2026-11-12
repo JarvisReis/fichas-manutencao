@@ -236,7 +236,11 @@ export default function TelaHome({
                 >
                   <span
                     className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                      exec.status === 'concluida' ? 'bg-emerald-500' : 'bg-amber-500'
+                      exec.status === 'pendente'
+                        ? 'bg-red-600'
+                        : exec.status === 'concluida'
+                          ? 'bg-emerald-500'
+                          : 'bg-amber-500'
                     }`}
                   />
                   <span className="min-w-0 flex-1">
@@ -244,7 +248,12 @@ export default function TelaHome({
                       {exec.codigo} · {exec.local || 'sem local'}
                     </span>
                     <span className="block text-xs text-slate-500">
-                      {exec.status === 'concluida' ? 'Concluída' : 'Rascunho'} ·{' '}
+                      {exec.status === 'pendente'
+                        ? 'Pendente'
+                        : exec.status === 'concluida'
+                          ? 'Concluída'
+                          : 'Rascunho'}{' '}
+                      ·{' '}
                       {new Date(exec.atualizadaEm).toLocaleString('pt-BR', {
                         day: '2-digit',
                         month: '2-digit',
@@ -337,10 +346,14 @@ function UltimaManutencao({ exec }: { exec: Execucao | undefined }) {
       <span className="text-[11px] text-slate-600">{quando}</span>
       <span
         className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${
-          aberta ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+          exec.status === 'pendente'
+            ? 'bg-red-600 text-white'
+            : aberta
+              ? 'bg-amber-100 text-amber-800'
+              : 'bg-emerald-100 text-emerald-800'
         }`}
       >
-        {aberta ? 'RASCUNHO' : 'CONCLUÍDA'}
+        {exec.status === 'pendente' ? 'PENDENTE' : aberta ? 'RASCUNHO' : 'CONCLUÍDA'}
       </span>
     </span>
   )

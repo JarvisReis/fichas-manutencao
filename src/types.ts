@@ -90,7 +90,12 @@ export interface Execucao {
   dataFim?: string
   valores: ValorItem[]
   observacaoGeral?: string
-  status: 'rascunho' | 'concluida'
+  /**
+   * `pendente` = concluída com pelo menos uma medição fora do limite. Ela é
+   * salva do mesmo jeito (nada bloqueia o técnico em campo), mas fica marcada
+   * em vermelho até alguém tratar o desvio.
+   */
+  status: 'rascunho' | 'concluida' | 'pendente'
   /** pessoa que criou a execução — só ela usa a janela de correção de 24 h */
   criadaPor?: string
   sincronizada: boolean

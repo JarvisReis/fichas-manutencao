@@ -160,12 +160,12 @@ export default function App() {
     } as Equipamento
   }
 
-  const salvarExecucao = async (id: string, status: 'rascunho' | 'concluida') => {
+  const salvarExecucao = async (id: string, status: Execucao['status']) => {
     const execucao = await db.execucoes.get(id)
     if (!execucao) return
     const atualizada: Execucao = { ...execucao, status, atualizadaEm: new Date().toISOString() }
     await db.execucoes.put(atualizada)
-    if (status === 'concluida') {
+    if (status !== 'rascunho') {
       const equipamento = await equipamentoDaExecucao(atualizada)
       setRota({ nome: 'salvo', execucao: atualizada, equipamento })
     } else {
@@ -271,13 +271,28 @@ export default function App() {
     case 'salvo':
       return (
         <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-8 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-3xl">
-            ✓
+          <div
+            className={`flex h-16 w-16 items-center justify-center rounded-full text-3xl ${
+              rota.execucao.status === 'pendente'
+                ? 'bg-red-100 text-red-700'
+                : 'bg-emerald-100 text-emerald-700'
+            }`}
+          >
+            {rota.execucao.status === 'pendente' ? '!' : '✓'}
           </div>
-          <h1 className="text-lg font-bold text-slate-900">Execução concluída</h1>
+          <h1
+            className={`text-lg font-bold ${
+              rota.execucao.status === 'pendente' ? 'text-red-700' : 'text-slate-900'
+            }`}
+          >
+            {rota.execucao.status === 'pendente'
+              ? 'Salva como pendente'
+              : 'Execução concluída'}
+          </h1>
           <p className="max-w-xs text-sm text-slate-600">
-            {rota.execucao.codigo} foi salva no aparelho e ficará na fila até sincronizar com o
-            SharePoint.
+            {rota.execucao.status === 'pendente'
+              ? `${rota.execucao.codigo} foi salva e está marcada como pendente: há medição fora do limite.`
+              : `${rota.execucao.codigo} foi salva no aparelho e ficará na fila até sincronizar com o SharePoint.`}
           </p>
           {rota.equipamento && (
             <button
