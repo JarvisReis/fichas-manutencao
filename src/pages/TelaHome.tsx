@@ -328,6 +328,16 @@ export default function TelaHome({
       </header>
 
       <div className="space-y-5 p-4">
+        {!sessao && (
+          <section>
+            <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              Sem identificação você está no modo consulta. Toque em entrar no cabeçalho para
+              executar manutenções.
+            </p>
+          </section>
+        )}
+
+        {sessao && (
         <section>
           <h2 className="mb-2 px-1 text-xs font-bold tracking-wide text-slate-500 uppercase">
             Novo serviço
@@ -475,6 +485,7 @@ export default function TelaHome({
             </div>
           )}
         </section>
+        )}
 
         {!sessao && (
           <section>
