@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { ArrowLeft, CheckCircle2, Clock, Trash2, X } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Clock, Search, Trash2, X } from 'lucide-react'
 import { db } from '../lib/db'
 import { getFicha } from '../config/fichas'
 import { avaliarItem, valorExibido } from '../lib/conformidade'
 import { excluirExecucaoNoServidor, obterEndpointAdmin } from '../lib/sync'
 import { podeEditarExecucao, tempoRestanteJanela } from '../lib/permissoes'
+import { normalizar } from '../lib/cadastros'
 import type { Sessao } from '../lib/sessao'
 
 interface Props {
@@ -28,6 +29,8 @@ export default function TelaHistorico({
     [],
     [],
   )
+
+  const [busca, setBusca] = useState('')
 
   const [confirmando, setConfirmando] = useState<{ id: string; codigo: string } | null>(null)
 
@@ -61,6 +64,30 @@ export default function TelaHistorico({
     setAviso({ erro: false, texto: 'Execução excluída no aparelho e no SharePoint.' })
   }
 
+  /*
+   * Mesmo filtro da home: termo livre sobre equipamento, local, identificação e
+   * ficha. A busca é por palavra — "ct 02 11" acha a ficha do CT 02 em novembro.
+   */
+  const filtradas = useMemo(() => {
+    const termo = normalizar(busca)
+    const lista = execucoes ?? []
+    if (!termo) return lista
+    const partes = termo.split(/\s+/)
+    return lista.filter((exec) => {
+      const ficha = getFicha(exec.fichaId)
+      const alvo = normalizar(
+        [
+          exec.camposFixos.equipamento ?? '',
+          exec.local,
+          exec.codigo,
+          ficha?.nomeCurto ?? '',
+          exec.tipoManutencao ?? '',
+        ].join(' '),
+      )
+      return partes.every((parte) => alvo.includes(parte))
+    })
+  }, [execucoes, busca])
+
   return (
     <div className="min-h-full pb-10">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur">
@@ -76,6 +103,21 @@ export default function TelaHistorico({
       </header>
 
       <div className="space-y-3 p-4">
+        <div className="flex items-center gap-2 rounded-xl border-2 border-slate-200 bg-white px-3 py-2.5">
+          <Search size={16} className="shrink-0 text-slate-400" />
+          <input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por equipamento, local, ficha ou identificação"
+            className="min-w-0 flex-1 bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+          />
+          {busca && (
+            <button type="button" onClick={() => setBusca('')} aria-label="Limpar busca">
+              <X size={16} className="text-slate-400" />
+            </button>
+          )}
+        </div>
+
         {aviso && (
           <div
             className={`flex items-start gap-2 rounded-xl border-2 p-3 text-[11px] font-medium ${
@@ -96,7 +138,13 @@ export default function TelaHistorico({
           </p>
         )}
 
-        {execucoes?.map((exec) => {
+        {execucoes && execucoes.length > 0 && filtradas.length === 0 && (
+          <p className="rounded-xl bg-slate-100 p-3 text-xs text-slate-600">
+            Nenhuma execução encontrada para "{busca}".
+          </p>
+        )}
+
+        {filtradas.map((exec) => {
           const ficha = getFicha(exec.fichaId)
           const fora = ficha
             ? ficha.itens.filter(
