@@ -402,7 +402,7 @@ export default function TelaHome({
               Nenhum contator encontrado para "{busca}".
             </p>
           ) : (
-            <div className="max-h-[22rem] space-y-2 overflow-y-auto overscroll-contain pr-1">
+            <div className="space-y-2">
               {filtrados.map((equip) => {
                 const ultima = ultimaPorEquipamento.get(equip.nome)
                 const quandoDaUltima = ultima
@@ -449,7 +449,7 @@ export default function TelaHome({
               })}
               {filtrados.length > 3 && (
                 <p className="pt-1 text-center text-[11px] text-slate-400">
-                  {filtrados.length} equipamentos — role a lista ou use a busca
+                  {filtrados.length} equipamentos — use a busca para achar mais rápido
                 </p>
               )}
             </div>
