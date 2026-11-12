@@ -48,6 +48,7 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
   )
   const [equipamentos, setEquipamentos] = useState<Equipamento[]>([])
   const [pessoas, setPessoas] = useState<Pessoa[]>([])
+  const [avisoEquipe, setAvisoEquipe] = useState<string | null>(null)
 
   // Puxa a memória dos campos fixos do equipamento (torquímetro, RGs)
   useEffect(() => {
@@ -118,6 +119,13 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
 
   /** RGs marcados na equipe viram os campos fixos rg1..rgN, na ordem do cadastro. */
   const selecionarPessoa = (pessoa: Pessoa) => {
+    // A pessoa escolhida pode vir do cadastro ainda sem RG preenchido; sem
+    // identidade não dá para gravar a equipe e o botão nunca libera.
+    if (!pessoa.rg || !pessoa.rg.trim()) {
+      setAvisoEquipe('Esta pessoa está sem RG no cadastro. Peça a um administrador para preencher.')
+      return
+    }
+    setAvisoEquipe(null)
     const atuais = extrairRgs(camposFixos)
     const jaEsta = atuais.some((rg) => rg.trim() === pessoa.rg.trim())
     const proximos = jaEsta
@@ -340,6 +348,11 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
             selecionados={equipe}
             onAlternar={selecionarPessoa}
           />
+          {avisoEquipe && (
+            <p className="mt-2 rounded-lg bg-amber-50 p-2 text-[11px] font-medium text-amber-900">
+              {avisoEquipe}
+            </p>
+          )}
           {!equipeCompleta && (
             <p className="mt-2 text-[11px] font-medium text-amber-800">
               Marque no mínimo 2 pessoas da equipe para iniciar as medições.
