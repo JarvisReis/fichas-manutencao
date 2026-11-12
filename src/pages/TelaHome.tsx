@@ -140,12 +140,18 @@ export default function TelaHome({
                 Nenhum contator cadastrado. Cadastre em <strong>Cadastros</strong> — a ficha de cada
                 serviço passa a ser escolhida automaticamente pelo equipamento.
               </p>
-              <button
-                onClick={onVerCadastros}
-                className="mt-2 w-full rounded-lg bg-slate-100 py-2 text-xs font-semibold text-slate-700"
-              >
-                Abrir cadastros
-              </button>
+              {ehAdministrador ? (
+                <button
+                  onClick={onVerCadastros}
+                  className="mt-2 w-full rounded-lg bg-slate-100 py-2 text-xs font-semibold text-slate-700"
+                >
+                  Abrir cadastros
+                </button>
+              ) : (
+                <p className="mt-2 text-xs text-amber-800">
+                  Peça a um administrador para cadastrar o contator e liberar as execuções.
+                </p>
+              )}
             </div>
           ) : filtrados.length === 0 ? (
             <p className="rounded-xl bg-slate-100 p-3 text-xs text-slate-600">
@@ -243,16 +249,18 @@ export default function TelaHome({
             <ChevronRight size={18} className="text-slate-400" />
           </button>
 
-          <button
-            onClick={onVerCadastros}
-            className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 text-left"
-          >
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
-              <Users size={20} />
-            </span>
-            <span className="flex-1 text-sm font-medium text-slate-800">Equipe e equipamentos</span>
-            <ChevronRight size={18} className="text-slate-400" />
-          </button>
+          {ehAdministrador && (
+            <button
+              onClick={onVerCadastros}
+              className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 text-left"
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
+                <Users size={20} />
+              </span>
+              <span className="flex-1 text-sm font-medium text-slate-800">Equipe e equipamentos</span>
+              <ChevronRight size={18} className="text-slate-400" />
+            </button>
+          )}
 
           {naoSincronizadas > 0 && (
             <div className="flex items-start gap-2 rounded-2xl border border-amber-300 bg-amber-50 p-3.5 text-xs text-amber-900">

@@ -144,6 +144,25 @@ export default function App() {
       )
 
     case 'cadastros':
+      // Sem sessão de administrador a tela não abre — nem por rota antiga.
+      if (!ehAdministrador) {
+        return (
+          <TelaHome
+            online={online}
+            temaEscuro={tema === 'escuro'}
+            sessao={sessao}
+            ehAdministrador={ehAdministrador}
+            onEntrar={entrar}
+            onSair={sair}
+            onNovaExecucaoDoEquipamento={(equip) => void novaExecucaoDoEquipamento(equip)}
+            onAbrirExecucao={(id) => void abrirExecucao(id)}
+            onVerHistorico={() => setRota({ nome: 'historico' })}
+            onVerBackup={() => setRota({ nome: 'backup' })}
+            onVerCadastros={() => setRota({ nome: 'cadastros' })}
+            onAlternarTema={alternar}
+          />
+        )
+      }
       return (
         <TelaCadastros
           administrador={ehAdministrador ? (sessao?.nome ?? '') : undefined}
