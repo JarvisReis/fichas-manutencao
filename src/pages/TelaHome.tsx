@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { AlertTriangle, ChevronRight, CloudOff, Database, HardDriveDownload, Moon, Search, Sun, Users, Wifi, X } from 'lucide-react'
+import { AlertTriangle, ChevronRight, Clock, CloudOff, Database, HardDriveDownload, Moon, Search, Sun, Users, Wifi, X } from 'lucide-react'
 import { db } from '../lib/db'
-import { FICHAS } from '../config/fichas'
+import { FICHAS, GRUPOS, grupoDaFicha } from '../config/fichas'
 import { lerEquipamentos, normalizar, type Equipamento } from '../lib/cadastros'
 import type { Sessao } from '../lib/sessao'
+import type { Execucao } from '../types'
 import SeletorSessao from '../components/SeletorSessao'
 
 interface Props {
@@ -46,6 +47,20 @@ export default function TelaHome({
 
   const naoSincronizadas = pendentes?.length ?? 0
 
+  /** Última execução de cada equipamento, para o cartão mostrar a manutenção feita. */
+  const todas = useLiveQuery(() => db.execucoes.toArray(), [], [])
+  const ultimaPorEquipamento = useMemo(() => {
+    const mapa = new Map<string, (typeof todas)[number]>()
+    for (const exec of [...(todas ?? [])].sort(
+      (a, b) => Date.parse(b.dataHora) - Date.parse(a.dataHora),
+    )) {
+      const nome = exec.camposFixos.equipamento?.trim()
+      if (nome && !mapa.has(nome)) mapa.set(nome, exec)
+    }
+    return mapa
+  }, [todas])
+
+  const [grupo, setGrupo] = useState(GRUPOS[0].id)
   const [busca, setBusca] = useState('')
   const [equipamentos, setEquipamentos] = useState<Equipamento[]>([])
 
@@ -63,13 +78,14 @@ export default function TelaHome({
   const filtrados = useMemo(() => {
     const termo = normalizar(busca)
     return equipamentos
+      .filter((e) => grupoDaFicha(e.fichaId) === grupo)
       .filter((e) => {
         if (!termo) return true
         const alvo = normalizar(`${e.nome} ${e.local} ${e.marca ?? ''} ${e.serie ?? ''}`)
         return termo.split(/\s+/).every((parte) => alvo.includes(parte))
       })
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
-  }, [equipamentos, busca])
+  }, [equipamentos, busca, grupo])
 
   return (
     <div className="min-h-full pb-10">
@@ -116,8 +132,25 @@ export default function TelaHome({
             Novo serviço
           </h2>
           <p className="mb-2 px-1 text-xs text-slate-500">
-            Escolha o contator — a ficha vem do que está cadastrado nele.
+            Escolha o equipamento — a ficha vem do que está cadastrado nele.
           </p>
+
+          <div className="mb-2 grid grid-cols-2 gap-2">
+            {GRUPOS.map((g) => (
+              <button
+                key={g.id}
+                onClick={() => {
+                  setGrupo(g.id)
+                  setBusca('')
+                }}
+                className={`rounded-xl px-3 py-2.5 text-xs font-semibold transition ${
+                  grupo === g.id ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-700'
+                }`}
+              >
+                {g.rotulo}
+              </button>
+            ))}
+          </div>
 
           <div className="mb-2 flex items-center gap-2 rounded-xl border-2 border-slate-200 bg-white px-3 py-2.5">
             <Search size={16} className="shrink-0 text-slate-400" />
@@ -134,11 +167,12 @@ export default function TelaHome({
             )}
           </div>
 
-          {equipamentos.length === 0 ? (
+          {equipamentos.filter((e) => grupoDaFicha(e.fichaId) === grupo).length === 0 ? (
             <div className="rounded-2xl border-2 border-dashed border-slate-300 p-4">
               <p className="text-xs text-slate-600">
-                Nenhum contator cadastrado. Cadastre em <strong>Cadastros</strong> — a ficha de cada
-                serviço passa a ser escolhida automaticamente pelo equipamento.
+                Nenhum equipamento de <strong>{GRUPOS.find((g) => g.id === grupo)?.rotulo}</strong>{' '}
+                cadastrado. Cadastre em <strong>Cadastros</strong> — a ficha de cada serviço passa a
+                ser escolhida automaticamente pelo equipamento.
               </p>
               {ehAdministrador ? (
                 <button
@@ -178,6 +212,7 @@ export default function TelaHome({
                       <span className="mt-0.5 block text-[11px] font-medium text-blue-700">
                         {ficha ? ficha.nomeCurto : 'ficha não definida'}
                       </span>
+                      <UltimaManutencao exec={ultimaPorEquipamento.get(equip.nome)} />
                     </span>
                     <ChevronRight size={18} className="shrink-0 text-slate-400" />
                   </button>
@@ -274,5 +309,39 @@ export default function TelaHome({
         </section>
       </div>
     </div>
+  )
+}
+
+/**
+ * Última manutenção daquele equipamento. Mostra quando foi, que tipo (P1/P2) e
+ * se está concluída — é o que o técnico olha antes de abrir um serviço novo.
+ */
+function UltimaManutencao({ exec }: { exec: Execucao | undefined }) {
+  if (!exec) {
+    return (
+      <span className="mt-1.5 flex items-center gap-1 text-[11px] text-slate-500">
+        <Clock size={11} /> sem manutenção registrada
+      </span>
+    )
+  }
+  const quando = new Date(exec.dataHora).toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+  })
+  const tipo = exec.tipoManutencao ?? '—'
+  const aberta = exec.status !== 'concluida'
+  return (
+    <span className="mt-1.5 flex flex-wrap items-center gap-1">
+      <span className="rounded bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white">{tipo}</span>
+      <span className="text-[11px] text-slate-600">{quando}</span>
+      <span
+        className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${
+          aberta ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+        }`}
+      >
+        {aberta ? 'RASCUNHO' : 'CONCLUÍDA'}
+      </span>
+    </span>
   )
 }

@@ -1,6 +1,20 @@
 import type { DefinicaoFicha } from '../types'
 
 /**
+ * Grupos de equipamento mostrados como abas na home. O grupo de um contator é o
+ * grupo da ficha dele — não é campo novo no cadastro: quem já tem contator
+ * cadastrado não precisa ser reclassificado.
+ */
+export const GRUPOS: { id: string; rotulo: string }[] = [
+  { id: 'contator', rotulo: 'Contator' },
+  { id: 'seccionadora', rotulo: 'Contator de Seccionadora' },
+]
+
+export function grupoDaFicha(fichaId: string): string {
+  return fichaId === 'SC-BI1' ? 'seccionadora' : 'contator'
+}
+
+/**
  * Definições das fichas de campo do Metrô.
  *
  * Cada ficha aqui é transcrição do formulário em papel — os limites, unidades e
