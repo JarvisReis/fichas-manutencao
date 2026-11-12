@@ -601,7 +601,7 @@ export default function TelaHome({
         )}
 
         <section className="space-y-2">
-          {naoSincronizadas > 0 && (
+          {sessao && naoSincronizadas > 0 && (
             <div className="flex items-start gap-2 rounded-2xl border border-amber-300 bg-amber-50 p-3.5 text-xs text-amber-900">
               <AlertTriangle size={16} className="mt-0.5 shrink-0" />
               <p>
