@@ -51,8 +51,7 @@ export default function TelaHome({
         .where('status')
         .equals('rascunho')
         .reverse()
-        .sortBy('atualizadaEm')
-        .then((lista) => lista.slice(0, 3)),
+        .sortBy('atualizadaEm'),
     [],
     [],
   )
@@ -74,23 +73,6 @@ export default function TelaHome({
       if (nome && !mapa.has(nome)) mapa.set(nome, exec)
     }
     return mapa
-  }, [todas])
-
-  /**
-   * Os três equipamentos com manutenção mais antiga — os que estão devendo
-   * serviço. É a leitura inversa do topo da lista: o que está há mais tempo sem
-   * atendimento. Rascunho não entra (não é manutenção encerrada).
-   */
-  const maisAntigos = useMemo(() => {
-    const mapa = new Map<string, (typeof todas)[number]>()
-    const ordenadas = [...(todas ?? [])]
-      .filter((e) => e.status !== 'rascunho')
-      .sort((a, b) => Date.parse(a.dataHora) - Date.parse(b.dataHora))
-    for (const exec of ordenadas) {
-      const nome = exec.camposFixos.equipamento?.trim()
-      if (nome && !mapa.has(nome)) mapa.set(nome, exec)
-    }
-    return [...mapa.values()].slice(0, 3)
   }, [todas])
 
   /** Os três equipamentos com manutenção mais recente: a lista começa por eles. */
@@ -134,6 +116,50 @@ export default function TelaHome({
       // sem persistência, a aba vale só nesta sessão
     }
   }
+
+  /**
+   * Rascunhos do grupo da aba, um por equipamento, os mais recentes primeiro.
+   * Cada linha é um equipamento — igual à caixa "Mais recente", não um monte de
+   * fichas do mesmo contator empilhadas.
+   */
+  const rascunhosDoGrupo = useMemo(() => {
+    const vistos = new Set<string>()
+    const lista: { exec: (typeof ultimas)[number]; total: number }[] = []
+    for (const exec of ultimas ?? []) {
+      if (grupoDaFicha(exec.fichaId) !== grupo) continue
+      const nome = (exec.camposFixos.equipamento ?? '').trim() || exec.codigo
+      const atual = lista.find((i) => (i.exec.camposFixos.equipamento ?? '').trim() === nome ||
+        i.exec.codigo === nome)
+      if (atual) {
+        atual.total += 1
+        continue
+      }
+      if (vistos.has(nome)) continue
+      vistos.add(nome)
+      lista.push({ exec, total: 1 })
+      if (lista.length === 3) break
+    }
+    return lista
+  }, [ultimas, grupo])
+
+  /**
+   * Os três equipamentos com manutenção mais antiga — os que estão devendo
+   * serviço. É a leitura inversa do topo da lista: o que está há mais tempo sem
+   * atendimento. Rascunho não entra (não é manutenção encerrada).
+   */
+  const maisAntigos = useMemo(() => {
+    const mapa = new Map<string, (typeof todas)[number]>()
+    const ordenadas = [...(todas ?? [])]
+      .filter((e) => e.status !== 'rascunho')
+      .filter((e) => grupoDaFicha(e.fichaId) === grupo)
+      .sort((a, b) => Date.parse(a.dataHora) - Date.parse(b.dataHora))
+    for (const exec of ordenadas) {
+      const nome = exec.camposFixos.equipamento?.trim()
+      if (nome && !mapa.has(nome)) mapa.set(nome, exec)
+    }
+    return [...mapa.values()].slice(0, 3)
+  }, [todas, grupo])
+
   const [busca, setBusca] = useState('')
   const [equipamentos, setEquipamentos] = useState<Equipamento[]>([])
 
@@ -305,7 +331,7 @@ export default function TelaHome({
 
           <div
             className={`mb-2 grid gap-1.5 ${
-              (ultimas?.length ?? 0) > 0 ? 'grid-cols-3' : 'grid-cols-2'
+              rascunhosDoGrupo.length > 0 ? 'grid-cols-3' : 'grid-cols-2'
             }`}
           >
             {(
@@ -316,7 +342,7 @@ export default function TelaHome({
               ] as const
             )
               // Sem rascunho aberto a etiqueta some — não há o que continuar.
-              .filter((c) => c.id !== 'rascunho' || (ultimas?.length ?? 0) > 0)
+              .filter((c) => c.id !== 'rascunho' || rascunhosDoGrupo.length > 0)
               .map((c) => (
               <button
                 key={c.id}
@@ -390,6 +416,15 @@ export default function TelaHome({
           )}
         </section>
 
+        {caixa === 'prioridade' && maisAntigos.length === 0 && (
+          <section>
+            <p className="rounded-xl bg-slate-100 p-3 text-xs text-slate-600">
+              Nenhum equipamento de {GRUPOS.find((g) => g.id === grupo)?.rotulo} com manutenção
+              encerrada — sem histórico não há como medir o tempo parado.
+            </p>
+          </section>
+        )}
+
         {caixa === 'prioridade' && maisAntigos.length > 0 && (
           <section>
             <h2 className="mb-2 px-1 text-xs font-bold tracking-wide text-slate-500 uppercase">
@@ -441,44 +476,53 @@ export default function TelaHome({
               Continuar
             </h2>
             <div className="space-y-2">
-              {ultimas.map((exec) => (
-                <button
-                  key={exec.id}
-                  onClick={() => onAbrirExecucao(exec.id)}
-                  className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 text-left"
-                >
-                  <span
-                    className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                      exec.status === 'pendente'
-                        ? 'bg-red-600'
-                        : exec.status === 'concluida'
-                          ? 'bg-emerald-500'
-                          : 'bg-amber-500'
-                    }`}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium text-slate-900">
-                      {exec.codigo} · {exec.local || 'sem local'}
+              {rascunhosDoGrupo.map(({ exec, total }) => {
+                const nome = (exec.camposFixos.equipamento ?? '').trim()
+                const equip = equipamentos.find((e) => e.nome.trim() === nome)
+                const quando = new Date(exec.atualizadaEm).toLocaleString('pt-BR', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+                return (
+                  <button
+                    key={exec.id}
+                    onClick={() => onAbrirExecucao(exec.id)}
+                    className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 text-left"
+                  >
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-500" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-slate-900">
+                        {nome || exec.codigo}
+                      </span>
+                      <span className="block truncate text-xs text-slate-500">
+                        {equip
+                          ? [equip.local, equip.marca, equip.serie].filter(Boolean).join(' · ') ||
+                            'sem detalhes'
+                          : exec.local || 'sem detalhes'}
+                      </span>
+                      <span className="mt-1.5 flex flex-wrap items-center gap-1">
+                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-800">
+                          RASCUNHO
+                        </span>
+                        <span className="text-[11px] text-slate-600">{quando}</span>
+                        {total > 1 && (
+                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-600">
+                            {total} EM ABERTO
+                          </span>
+                        )}
+                        {!exec.sincronizada && (
+                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-500">
+                            NÃO ENVIADO
+                          </span>
+                        )}
+                      </span>
                     </span>
-                    <span className="block text-xs text-slate-500">
-                      {exec.status === 'pendente'
-                        ? 'Pendente'
-                        : exec.status === 'concluida'
-                          ? 'Concluída'
-                          : 'Rascunho'}{' '}
-                      ·{' '}
-                      {new Date(exec.atualizadaEm).toLocaleString('pt-BR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                      {!exec.sincronizada && ' · pendente'}
-                    </span>
-                  </span>
-                  <ChevronRight size={18} className="shrink-0 text-slate-400" />
-                </button>
-              ))}
+                    <ChevronRight size={18} className="shrink-0 text-slate-400" />
+                  </button>
+                )
+              })}
             </div>
           </section>
         )}
