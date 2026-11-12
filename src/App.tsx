@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus } from 'lucide-react'
 import type { DefinicaoFicha, Execucao } from './types'
 import { db, gerarCodigo } from './lib/db'
 import { getFicha } from './config/fichas'
@@ -309,14 +308,6 @@ export default function App() {
               ? `${rota.execucao.codigo} foi salva e está marcada como pendente: há medição fora do limite.`
               : `${rota.execucao.codigo} foi salva no aparelho e ficará na fila até sincronizar com o SharePoint.`}
           </p>
-          {rota.equipamento && (
-            <button
-              onClick={() => void novaExecucaoDoEquipamento(rota.equipamento!)}
-              className="mt-2 flex w-full max-w-xs items-center justify-center gap-2 rounded-xl bg-blue-700 py-3.5 text-sm font-semibold text-white active:bg-blue-800"
-            >
-              <Plus size={18} /> Nova manutenção deste equipamento
-            </button>
-          )}
           <button
             onClick={() => setRota({ nome: 'home' })}
             className="w-full max-w-xs rounded-xl border-2 border-slate-300 py-3 text-sm font-semibold text-slate-700"

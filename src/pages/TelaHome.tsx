@@ -132,7 +132,7 @@ export default function TelaHome({
             Novo serviço
           </h2>
           <p className="mb-2 px-1 text-xs text-slate-500">
-            Escolha o equipamento — a ficha vem do que está cadastrado nele.
+            Escolha o equipamento — para visualizar dados completos.
           </p>
 
           <div className="mb-2 grid grid-cols-2 gap-2">
