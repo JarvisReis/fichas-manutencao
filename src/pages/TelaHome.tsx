@@ -268,8 +268,8 @@ export default function TelaHome({
             <button
               onClick={onEntrar}
               className="rounded-full bg-white/15 p-1.5 text-white active:bg-white/25"
-              aria-label="Identificar-se"
-              title="Identificar-se"
+              aria-label="Entrar"
+              title="Entrar"
             >
               <LogIn size={15} />
             </button>
