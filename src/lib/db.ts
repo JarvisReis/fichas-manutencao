@@ -37,6 +37,37 @@ export async function salvarCamposFixos(fichaId: string, valores: Record<string,
   await db.config.put({ chave: `camposFixos:${fichaId}`, valor: JSON.stringify(valores) })
 }
 
+/**
+ * Último núcleo instalado conhecido em um equipamento.
+ *
+ * O vínculo núcleo↔contator só é confirmado na P2; por isso a memória por ficha
+ * (camposFixos:<fichaId>) não serve. Aqui procuramos a execução mais recente do
+ * equipamento que tenha `nucleoInstalado` gravado, e aceitamos a própria execução
+ * atual como candidata (para rascunhos em andamento).
+ */
+export async function lerNucleoInstalado(
+  equipamento: string,
+  atual: { id: string; equipamento?: string; nucleoInstalado?: string; atualizadaEm: string },
+): Promise<string | undefined> {
+  const alvo = equipamento.trim()
+  if (!alvo) return undefined
+
+  const execucoes = await db.execucoes.toArray()
+  const candidatas = execucoes.filter(
+    (e) => (e.camposFixos.equipamento ?? '').trim() === alvo && !!e.nucleoInstalado?.trim(),
+  )
+
+  if (atual.equipamento?.trim() === alvo && atual.nucleoInstalado?.trim()) {
+    candidatas.push({
+      ...atual,
+      nucleoInstalado: atual.nucleoInstalado,
+    } as (typeof candidatas)[number])
+  }
+
+  candidatas.sort((a, b) => b.atualizadaEm.localeCompare(a.atualizadaEm))
+  return candidatas[0]?.nucleoInstalado?.trim()
+}
+
 export function gerarCodigo(prefixo: string, existentes: { codigo: string }[]): string {
   const hoje = new Date()
   const dia = `${hoje.getFullYear()}${String(hoje.getMonth() + 1).padStart(2, '0')}${String(

@@ -71,6 +71,12 @@ export interface Execucao {
   tipoManutencao?: TipoManutencao
   cabecalho: Record<string, string>
   camposFixos: Record<string, string>
+  /**
+   * Núcleo instalado no contator (HPB001–HPB099). Preenchido automaticamente a
+   * partir da última manutenção do equipamento; só é editado na P2 (onde se
+   * troca o núcleo). Na P1 fica somente leitura.
+   */
+  nucleoInstalado?: string
   local: string
   dataHora: string
   valores: ValorItem[]
