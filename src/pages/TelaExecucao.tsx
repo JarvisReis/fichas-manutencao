@@ -51,6 +51,8 @@ export default function TelaExecucao({
    * para o seguinte, na mesma ordem em que os itens aparecem na ficha.
    */
   const camposRef = useRef<(HTMLInputElement | null)[]>([])
+  // Observação entra no fim da sequência: o técnico avança das medições direto para ela.
+  const obsRef = useRef<HTMLTextAreaElement | null>(null)
 
   const focarCampo = (posicao: number) => {
     const campos = camposRef.current
@@ -62,7 +64,13 @@ export default function TelaExecucao({
         return
       }
     }
-    // último campo: fecha o teclado em vez de deixar preso
+    // Passou da última medição: segue para a observação, se ela for editável.
+    const obs = obsRef.current
+    if (posicao >= totalMedicoes && obs && !obs.readOnly) {
+      obs.focus()
+      return
+    }
+    // Último campo de verdade: fecha o teclado em vez de deixar preso.
     campos[posicao]?.blur()
   }
 
@@ -380,6 +388,7 @@ export default function TelaExecucao({
         <section className="rounded-2xl border-2 border-slate-200 bg-white p-4">
           <h3 className="mb-2 text-sm font-semibold text-slate-900">Observação</h3>
           <textarea
+            ref={obsRef}
             value={obsGeral}
             readOnly={!podeAlterar}
             onChange={(e) => {
