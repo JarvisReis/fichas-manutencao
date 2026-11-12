@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { AlertTriangle, ChevronRight, Clock, CloudOff, Database, HardDriveDownload, Menu, Moon, Search, Sun, Users, Wifi, X } from 'lucide-react'
 import { db } from '../lib/db'
-import { FICHAS, GRUPOS, grupoDaFicha } from '../config/fichas'
+import { GRUPOS, grupoDaFicha } from '../config/fichas'
 import { lerEquipamentos, lerPessoas, normalizar, type Equipamento, type Pessoa } from '../lib/cadastros'
 import type { Sessao } from '../lib/sessao'
 import type { Execucao } from '../types'
@@ -404,7 +404,14 @@ export default function TelaHome({
           ) : (
             <div className="max-h-[22rem] space-y-2 overflow-y-auto overscroll-contain pr-1">
               {filtrados.map((equip) => {
-                const ficha = FICHAS.find((f) => f.id === equip.fichaId)
+                const ultima = ultimaPorEquipamento.get(equip.nome)
+                const quandoDaUltima = ultima
+                  ? new Date(ultima.dataHora).toLocaleString('pt-BR', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: '2-digit',
+                    })
+                  : null
                 return (
                   <button
                     key={equip.id}
@@ -420,27 +427,15 @@ export default function TelaHome({
                         {[equip.local, equip.serie].filter(Boolean).join(' · ') || 'sem detalhes'}
                       </span>
                       <span className="mt-1.5 flex flex-wrap items-center gap-1">
-                        <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">
-                          {ficha ? ficha.nomeCurto.toUpperCase() : 'FICHA NÃO DEFINIDA'}
-                        </span>
-                        <UltimaManutencao exec={ultimaPorEquipamento.get(equip.nome)} />
-                        {(() => {
-                          const ultima = ultimaPorEquipamento.get(equip.nome)
-                          if (!ultima) return null
-                          const quando = new Date(ultima.dataHora).toLocaleString('pt-BR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: '2-digit',
-                          })
-                          return (
-                            <>
-                              <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">
-                                {ultima.tipoManutencao ?? '—'}
-                              </span>
-                              <span className="text-[11px] text-slate-600">{quando}</span>
-                            </>
-                          )
-                        })()}
+                        <UltimaManutencao exec={ultima} />
+                        {ultima && (
+                          <>
+                            <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">
+                              {ultima.tipoManutencao ?? '—'}
+                            </span>
+                            <span className="text-[11px] text-slate-600">{quandoDaUltima}</span>
+                          </>
+                        )}
                         {naoEnviadas.has(equip.nome.trim()) && (
                           <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-500">
                             NÃO ENVIADO
