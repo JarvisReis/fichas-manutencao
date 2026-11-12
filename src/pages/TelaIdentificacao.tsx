@@ -38,9 +38,11 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
     paraInputLocal(execucao.dataFim ?? somarDias(execucao.dataHora, dias - 1)),
   )
   const [marca, setMarca] = useState<Marca | undefined>(execucao.marca)
+  // P1 é o padrão: se o técnico não escolher o tipo, a ficha é salva como P1.
   const [tipoManutencao, setTipoManutencao] = useState<TipoManutencao | undefined>(
     execucao.tipoManutencao ?? ficha.tiposManutencao[0],
   )
+  const [tipoEscolhido, setTipoEscolhido] = useState(Boolean(execucao.tipoManutencao))
   const [equipamentoNome, setEquipamentoNome] = useState(execucao.camposFixos.equipamento ?? '')
   const [nucleoInstalado, setNucleoInstalado] = useState(execucao.nucleoInstalado ?? '')
   const [nucleoRetirado, setNucleoRetirado] = useState(
@@ -161,6 +163,8 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
   // e o registro precisa identificar quem mediu e quem acompanhou.
   const equipe = extrairRgs(camposFixos)
   const equipeCompleta = equipe.length >= 2
+  // Sem escolha explícita vale P1 (primeiro tipo da ficha), então o tipo nunca
+  // barra o avanço — o contrato é: não escolheu, salva como P1.
   const podeContinuar =
     local.trim().length > 0 && (!ficha.exigeMarca || !!marca) && !!tipoManutencao && equipeCompleta
 
@@ -225,12 +229,14 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
         <section className="rounded-2xl border-2 border-slate-200 bg-white p-4">
           <h3 className="mb-2 text-sm font-semibold text-slate-900">Tipo de manutenção</h3>
           {ficha.tiposManutencao.length > 1 ? (
+            <>
             <div className="grid grid-cols-2 gap-2">
               {ficha.tiposManutencao.map((tipo) => (
                 <button
                   key={tipo}
                   onClick={() => {
                     setTipoManutencao(tipo)
+                    setTipoEscolhido(true)
                     salvarCampos({ tipoManutencao: tipo })
                   }}
                   className={`rounded-xl border-2 py-3 text-sm font-semibold transition ${
@@ -243,6 +249,13 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
                 </button>
               ))}
             </div>
+            {!tipoEscolhido && (
+              <p className="mt-2 text-[11px] font-medium text-slate-600">
+                Nenhum tipo escolhido — a ficha será salva como{' '}
+                <strong>{ficha.tiposManutencao[0]}</strong>.
+              </p>
+            )}
+            </>
           ) : (
             <p className="rounded-xl bg-slate-100 px-3 py-2.5 text-sm font-semibold text-slate-700">
               {ficha.tiposManutencao[0]} — única manutenção prevista para este equipamento
