@@ -104,21 +104,41 @@ export async function lerNucleoInstalado(
 /**
  * Identificação da manutenção: nome do equipamento + data.
  *
- * O código antigo (CT-20261112-001) não dizia nada em campo; o técnico lê
- * "CT 02 · 12/11/2026" e sabe de que equipamento e de que dia é a ficha.
- * Se o mesmo equipamento tiver duas manutenções no mesmo dia, acrescenta o
- * horário — assim a identificação continua única.
+ * O técnico lê "CT 02 · 12/11/2026" e sabe de que equipamento e de que dia é a
+ * ficha. Quando a manutenção cobre mais de um dia (contator = 2 dias), a
+ * identificação leva o intervalo: "CT 02 · 12–13/11/2026".
+ *
+ * O horário só entra quando o mesmo equipamento já tem ficha no mesmo dia —
+ * aí a identificação precisa de algo a mais para continuar única.
  */
 export function gerarCodigo(
   equipamento: string,
   data: Date = new Date(),
   existentes: { codigo: string }[] = [],
+  dataFim?: string,
 ): string {
+  const nome = equipamento.trim()
   const dia = data.toLocaleDateString('pt-BR')
-  const base = `${equipamento.trim()} · ${dia}`
-  if (!existentes.some((e) => e.codigo === base)) return base
+  const diaFim = dataFim ? new Date(dataFim) : null
+  const fimValido = diaFim && diaFim.getTime() !== data.getTime() ? diaFim : null
+
+  const base = fimValido ? `${nome} · ${intervalo(data, fimValido)}` : `${nome} · ${dia}`
+
+  const mesmoDia = existentes.some((e) => e.codigo.startsWith(`${nome} · `) && e.codigo === base)
+  if (!mesmoDia) return base
   const hora = data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
   return `${base} ${hora}`
+}
+
+/** "12–13/11/2026" quando o mês/ano é o mesmo; senão, as duas datas inteiras. */
+function intervalo(inicio: Date, fim: Date): string {
+  const mesmaReferencia =
+    inicio.getMonth() === fim.getMonth() && inicio.getFullYear() === fim.getFullYear()
+  if (mesmaReferencia) {
+    const d = (n: number) => String(n).padStart(2, '0')
+    return `${d(inicio.getDate())}–${fim.toLocaleDateString('pt-BR')}`
+  }
+  return `${inicio.toLocaleDateString('pt-BR')}–${fim.toLocaleDateString('pt-BR')}`
 }
 
 /** Comprime a foto no cliente antes de guardar (alvo < 300 KB). */

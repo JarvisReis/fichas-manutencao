@@ -21,6 +21,7 @@ export interface PacoteBackup {
     cabecalho: Record<string, string>
     camposFixos: Record<string, string>
     dataHora: string
+    dataFim?: string
     status: string
     sincronizada: boolean
     observacaoGeral?: string
@@ -72,6 +73,7 @@ export async function montarBackup(): Promise<PacoteBackup> {
         cabecalho: exec.cabecalho,
         camposFixos: exec.camposFixos,
         dataHora: exec.dataHora,
+        dataFim: exec.dataFim,
         status: exec.status,
         sincronizada: exec.sincronizada,
         observacaoGeral: exec.observacaoGeral,
@@ -117,6 +119,7 @@ export async function montarPacoteExecucao(execucaoId: string): Promise<PacoteBa
         cabecalho: exec.cabecalho,
         camposFixos: exec.camposFixos,
         dataHora: exec.dataHora,
+        dataFim: exec.dataFim,
         status: exec.status,
         sincronizada: exec.sincronizada,
         observacaoGeral: exec.observacaoGeral,

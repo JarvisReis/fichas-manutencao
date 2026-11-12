@@ -1,7 +1,13 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, ArrowRight, Info } from 'lucide-react'
 import type { DefinicaoFicha, Execucao, Marca, TipoManutencao } from '../types'
-import { lerCamposFixos, lerEndpointSync, lerNucleoInstalado, salvarCamposFixos } from '../lib/db'
+import {
+  gerarCodigo,
+  lerCamposFixos,
+  lerEndpointSync,
+  lerNucleoInstalado,
+  salvarCamposFixos,
+} from '../lib/db'
 import { lerNucleoDoServidor } from '../lib/sync'
 import {
   lerEquipamentos,
@@ -25,6 +31,12 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
   const [camposFixos, setCamposFixos] = useState<Record<string, string>>(execucao.camposFixos)
   const [local, setLocal] = useState(execucao.local)
   const [dataHora, setDataHora] = useState(() => paraInputLocal(execucao.dataHora))
+  // Manutenção de vários dias (contator = 2): o app já sugere o encerramento
+  // em dias-1, mas o técnico ajusta se a parada escorregar.
+  const dias = ficha.dias ?? 1
+  const [dataFim, setDataFim] = useState(() =>
+    paraInputLocal(execucao.dataFim ?? somarDias(execucao.dataHora, dias - 1)),
+  )
   const [marca, setMarca] = useState<Marca | undefined>(execucao.marca)
   const [tipoManutencao, setTipoManutencao] = useState<TipoManutencao | undefined>(
     execucao.tipoManutencao ?? ficha.tiposManutencao[0],
@@ -148,13 +160,22 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
     else delete fixosSaida.serieRetirado
 
     void salvarCamposFixos(ficha.id, fixosSaida)
+    const inicio = new Date(dataHora)
+    const fim = dias > 1 ? new Date(dataFim) : inicio
     onAtualizar({
       camposFixos: fixosSaida,
       local: local.trim(),
       marca,
       tipoManutencao,
       nucleoInstalado,
-      dataHora: new Date(dataHora).toISOString(),
+      dataHora: inicio.toISOString(),
+      dataFim: dias > 1 ? fim.toISOString() : undefined,
+      codigo: gerarCodigo(
+        equipamentoNome,
+        inicio,
+        undefined,
+        dias > 1 ? fim.toISOString() : undefined,
+      ),
     })
     onContinuar()
   }
@@ -266,14 +287,37 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
           </label>
 
           <label className="block">
-            <span className="mb-1 block text-xs font-medium text-slate-600">Data e hora</span>
+            <span className="mb-1 block text-xs font-medium text-slate-600">
+              {dias > 1 ? 'Início' : 'Data e hora'}
+            </span>
             <input
               type="datetime-local"
               value={dataHora}
-              onChange={(e) => setDataHora(e.target.value)}
+              onChange={(e) => {
+                setDataHora(e.target.value)
+                // mantém o encerramento coerente com o novo início
+                if (dias > 1) setDataFim(somarDias(new Date(e.target.value).toISOString(), dias - 1))
+              }}
               className="w-full rounded-xl border-2 border-slate-300 px-3 py-3 text-base text-slate-900 outline-none focus:border-blue-600"
             />
           </label>
+
+          {dias > 1 && (
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-600">Encerramento</span>
+              <input
+                type="datetime-local"
+                value={dataFim}
+                onChange={(e) => setDataFim(e.target.value)}
+                className="w-full rounded-xl border-2 border-slate-300 px-3 py-3 text-base text-slate-900 outline-none focus:border-blue-600"
+              />
+              <span className="mt-1.5 flex items-start gap-2 rounded-xl bg-blue-50 p-2.5 text-[11px] text-blue-900">
+                <Info size={14} className="mt-0.5 shrink-0" />
+                Esta manutenção dura {dias} dias e fecha uma ficha só — a identificação fica com o
+                intervalo de datas.
+              </span>
+            </label>
+          )}
         </section>
 
         <section className="rounded-2xl border-2 border-slate-200 bg-white p-4">
@@ -423,4 +467,11 @@ function paraInputLocal(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(
     d.getMinutes(),
   )}`
+}
+
+/** Mesmo horário, `n` dias depois — em ISO. */
+function somarDias(iso: string, n: number): string {
+  const d = new Date(iso)
+  d.setDate(d.getDate() + n)
+  return d.toISOString()
 }

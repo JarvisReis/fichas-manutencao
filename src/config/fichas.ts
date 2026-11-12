@@ -30,6 +30,7 @@ export const FICHAS: DefinicaoFicha[] = [
     prefixo: 'CT',
     exigeMarca: false,
     tiposManutencao: ['P1', 'P2'],
+    dias: 2,
     itens: [
       {
         id: 'barr-nucleo-barr',
@@ -92,6 +93,7 @@ export const FICHAS: DefinicaoFicha[] = [
     prefixo: 'CT',
     exigeMarca: true,
     tiposManutencao: ['P1', 'P2'],
+    dias: 2,
     itens: [
       {
         id: 'nucleo-estrutura',
@@ -180,6 +182,7 @@ export const FICHAS: DefinicaoFicha[] = [
     prefixo: 'SC',
     exigeMarca: false,
     tiposManutencao: ['P1'],
+    dias: 1,
     itens: [
       {
         id: 'corrente-motor',

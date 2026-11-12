@@ -48,6 +48,12 @@ export interface DefinicaoFicha {
    * Quando há mais de um, o app mostra um seletor na identificação.
    */
   tiposManutencao: TipoManutencao[]
+  /**
+   * Quantos dias a manutenção dura. O contator é feito em 2 dias e fecha UMA
+   * ficha só (a identificação vira um intervalo de datas); o seccionador é de
+   * um dia. Ausente = 1 dia.
+   */
+  dias?: number
   itens: ItemFicha[]
   /** campos fixos por equipamento, guardados com memória do último valor */
   camposFixos: CampoExtra[]
@@ -77,6 +83,11 @@ export interface Execucao {
   nucleoInstalado?: string
   local: string
   dataHora: string
+  /**
+   * Data de encerramento, quando a ficha cobre mais de um dia (contator: 2 dias).
+   * Ausente ou igual a `dataHora` = manutenção de um dia só.
+   */
+  dataFim?: string
   valores: ValorItem[]
   observacaoGeral?: string
   status: 'rascunho' | 'concluida'

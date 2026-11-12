@@ -39,6 +39,8 @@ export interface ExecucaoExportada {
   nucleoRetirado?: string
   local: string
   dataHora: string
+  /** encerramento, quando a ficha cobre mais de um dia */
+  dataFim?: string
   status: string
   observacaoGeral?: string
   naoConformes: number
@@ -92,6 +94,7 @@ export async function montarEnvio(execucaoId: string): Promise<ExecucaoExportada
     nucleoRetirado: exec.tipoManutencao === 'P2' ? exec.camposFixos.serieRetirado || undefined : undefined,
     local: exec.local,
     dataHora: exec.dataHora,
+    dataFim: exec.dataFim,
     status: exec.status,
     observacaoGeral: exec.observacaoGeral,
     naoConformes,
