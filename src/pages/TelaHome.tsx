@@ -158,34 +158,22 @@ export default function TelaHome({
         return termo.split(/\s+/).every((parte) => alvo.includes(parte))
       })
       .sort((a, b) => {
-        // "Mais recente": os três últimos equipamentos atendidos vêm no topo.
-        // Nas outras leituras, ordem alfabética — quem manda é a caixa de baixo.
+        // Os três últimos equipamentos atendidos vêm no topo; o resto, alfabético.
+        // Quem escolhe a leitura da tela é a etiqueta, não a ordem da lista.
         const ia = ultimosEquipamentos.indexOf(a.nome.trim())
         const ib = ultimosEquipamentos.indexOf(b.nome.trim())
-        if (caixa !== 'prioridade' && (ia !== -1 || ib !== -1)) {
+        if (ia !== -1 || ib !== -1) {
           if (ia === -1) return 1
           if (ib === -1) return -1
           return ia - ib
         }
         return a.nome.localeCompare(b.nome, 'pt-BR')
       })
-  }, [equipamentos, busca, grupo, ultimosEquipamentos, caixa])
+  }, [equipamentos, busca, grupo, ultimosEquipamentos])
 
   return (
     <div className="min-h-full pb-10">
       <header className="relative bg-gradient-to-br from-blue-800 to-blue-600 px-5 pt-8 pb-7 text-white">
-        {/* Barra do usuário no topo do cabeçalho: a mesma linha do rótulo e dos
-            controles. Não abre caixa nova — o header mantém a altura. */}
-        <div className="mb-3 flex items-center gap-2">
-          <SeletorSessao
-            sessao={sessao}
-            ehAdministrador={ehAdministrador}
-            onEntrar={onEntrar}
-            onSair={onSair}
-            compacto
-          />
-        </div>
-
         <div className="mb-1 flex items-center justify-between">
           <p className="text-xs font-medium tracking-wide text-blue-100 uppercase">Metrô · Manutenção</p>
           <div className="flex items-center gap-2">
@@ -260,6 +248,18 @@ export default function TelaHome({
             ? `${naoSincronizadas} execução(ões) aguardando sincronização`
             : 'Tudo sincronizado'}
         </p>
+
+        {/* Barra do usuário no rodapé da faixa azul: cabe inteira ao lado do
+            status e não abre caixa nova no corpo da página. */}
+        <div className="mt-3 flex items-center gap-2">
+          <SeletorSessao
+            sessao={sessao}
+            ehAdministrador={ehAdministrador}
+            onEntrar={onEntrar}
+            onSair={onSair}
+            compacto
+          />
+        </div>
       </header>
 
       <div className="space-y-5 p-4">
@@ -330,7 +330,7 @@ export default function TelaHome({
             ))}
           </div>
 
-          {equipamentos.filter((e) => grupoDaFicha(e.fichaId) === grupo).length === 0 ? (
+          {caixa !== 'recente' ? null : equipamentos.filter((e) => grupoDaFicha(e.fichaId) === grupo).length === 0 ? (
             <div className="rounded-2xl border-2 border-dashed border-slate-300 p-4">
               <p className="text-xs text-slate-600">
                 Nenhum equipamento de <strong>{GRUPOS.find((g) => g.id === grupo)?.rotulo}</strong>{' '}
