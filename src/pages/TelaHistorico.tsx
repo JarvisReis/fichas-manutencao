@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { ArrowLeft, CheckCircle2, Clock, Trash2 } from 'lucide-react'
 import { db } from '../lib/db'
@@ -5,21 +6,26 @@ import { getFicha } from '../config/fichas'
 import { avaliarItem, valorExibido } from '../lib/conformidade'
 
 interface Props {
+  /** só administrador apaga uma execução salva */
+  podeExcluir: boolean
   onVoltar: () => void
   onAbrir: (id: string) => void
 }
 
-export default function TelaHistorico({ onVoltar, onAbrir }: Props) {
+export default function TelaHistorico({ podeExcluir, onVoltar, onAbrir }: Props) {
   const execucoes = useLiveQuery(
     () => db.execucoes.orderBy('atualizadaEm').reverse().toArray(),
     [],
     [],
   )
 
+  const [confirmando, setConfirmando] = useState<{ id: string; codigo: string } | null>(null)
+
   const excluir = async (id: string) => {
     const fotos = await db.fotos.where('execucaoId').equals(id).toArray()
     for (const f of fotos) await db.fotos.delete(f.id)
     await db.execucoes.delete(id)
+    setConfirmando(null)
   }
 
   return (
@@ -69,13 +75,15 @@ export default function TelaHistorico({ onVoltar, onAbrir }: Props) {
                     {new Date(exec.dataHora).toLocaleString('pt-BR')}
                   </p>
                 </div>
-                <button
-                  onClick={() => void excluir(exec.id)}
-                  className="rounded-lg p-2 text-slate-400 active:bg-slate-100"
-                  aria-label="Excluir execução"
-                >
-                  <Trash2 size={16} />
-                </button>
+                {podeExcluir && (
+                  <button
+                    onClick={() => setConfirmando({ id: exec.id, codigo: exec.codigo })}
+                    className="rounded-lg p-2 text-red-600 active:bg-red-50"
+                    aria-label="Excluir execução"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                )}
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-medium">
@@ -135,6 +143,32 @@ export default function TelaHistorico({ onVoltar, onAbrir }: Props) {
           )
         })}
       </div>
+
+      {confirmando && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+            <h2 className="text-base font-bold text-slate-900">Excluir execução?</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              A ficha <strong>{confirmando.codigo}</strong> será apagada deste aparelho, incluindo as
+              fotos. Não há como desfazer.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => setConfirmando(null)}
+                className="flex-1 rounded-xl border-2 border-slate-300 py-3 text-sm font-semibold text-slate-700"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => void excluir(confirmando.id)}
+                className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-semibold text-white"
+              >
+                Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

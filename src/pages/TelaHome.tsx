@@ -4,8 +4,14 @@ import { AlertTriangle, ChevronRight, CloudOff, Database, HardDriveDownload, Moo
 import { db } from '../lib/db'
 import { FICHAS } from '../config/fichas'
 import { lerEquipamentos, normalizar, type Equipamento } from '../lib/cadastros'
+import type { Sessao } from '../lib/sessao'
+import SeletorSessao from '../components/SeletorSessao'
 
 interface Props {
+  sessao: Sessao | null
+  onEntrar: (sessao: Sessao) => void
+  onSair: () => void
+  ehAdministrador: boolean
   /** Abre a execução já com a ficha definida pelo cadastro do contator. */
   onNovaExecucaoDoEquipamento: (equipamento: Equipamento) => void
   onAbrirExecucao: (id: string) => void
@@ -18,6 +24,10 @@ interface Props {
 }
 
 export default function TelaHome({
+  sessao,
+  onEntrar,
+  onSair,
+  ehAdministrador,
   onNovaExecucaoDoEquipamento,
   onAbrirExecucao,
   onVerHistorico,
@@ -94,6 +104,13 @@ export default function TelaHome({
       </header>
 
       <div className="space-y-5 p-4">
+        <SeletorSessao
+          sessao={sessao}
+          ehAdministrador={ehAdministrador}
+          onEntrar={onEntrar}
+          onSair={onSair}
+        />
+
         <section>
           <h2 className="mb-2 px-1 text-xs font-bold tracking-wide text-slate-500 uppercase">
             Novo serviço

@@ -15,11 +15,13 @@ import { ShieldCheck, User as UserIcon } from 'lucide-react'
 
 interface Props {
   onVoltar: () => void
+  /** nome de quem está logado como administrador (mostrado no cabeçalho) */
+  administrador?: string
 }
 
 type Aba = 'equipamentos' | 'equipe'
 
-export default function TelaCadastros({ onVoltar }: Props) {
+export default function TelaCadastros({ onVoltar, administrador }: Props) {
   const [aba, setAba] = useState<Aba>('equipe')
   const [equipamentos, setEquipamentos] = useState<Equipamento[]>([])
   const [pessoas, setPessoas] = useState<Pessoa[]>([])
@@ -64,7 +66,9 @@ export default function TelaCadastros({ onVoltar }: Props) {
           </button>
           <div className="flex-1">
             <p className="text-sm font-semibold text-slate-900">Cadastros</p>
-            <p className="text-xs text-slate-500">Equipamentos e equipe</p>
+            <p className="text-xs text-slate-500">
+              Equipamentos e equipe{administrador ? ` · ${administrador}` : ''}
+            </p>
           </div>
         </div>
 
@@ -120,8 +124,11 @@ function EditorPessoas({
     onSalvar(pessoas.map((p) => (p.id === pessoa.id ? { ...p, ativo: !p.ativo } : p)))
   }
 
+  const [confirmando, setConfirmando] = useState<{ id: string; nome: string } | null>(null)
+
   const excluir = (pessoa: Pessoa) => {
     onSalvar(pessoas.filter((p) => p.id !== pessoa.id))
+    setConfirmando(null)
   }
 
   const ordenadas = [...pessoas].sort((a, b) => {
@@ -217,7 +224,7 @@ function EditorPessoas({
                 <Pencil size={16} />
               </button>
               <button
-                onClick={() => excluir(pessoa)}
+                onClick={() => setConfirmando({ id: pessoa.id, nome: pessoa.nome })}
                 className="shrink-0 rounded-lg p-2 text-red-600 active:bg-red-50"
                 aria-label={`Excluir ${pessoa.nome}`}
               >
@@ -226,6 +233,17 @@ function EditorPessoas({
             </div>
           ))}
         </div>
+      )}
+
+      {confirmando && (
+        <ConfirmarExclusao
+          rotulo="funcionário"
+          nome={confirmando.nome}
+          onCancelar={() => setConfirmando(null)}
+          onConfirmar={() =>
+            excluir(pessoas.find((p) => p.id === confirmando.id) ?? { id: confirmando.id } as Pessoa)
+          }
+        />
       )}
     </div>
   )
@@ -381,8 +399,11 @@ function EditorEquipamentos({
     setEditando(null)
   }
 
+  const [confirmando, setConfirmando] = useState<{ id: string; nome: string } | null>(null)
+
   const excluir = (equip: Equipamento) => {
     onSalvar(equipamentos.filter((e) => e.id !== equip.id))
+    setConfirmando(null)
   }
 
   const ordenados = [...equipamentos].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
@@ -450,7 +471,7 @@ function EditorEquipamentos({
                 <Pencil size={16} />
               </button>
               <button
-                onClick={() => excluir(equip)}
+                onClick={() => setConfirmando({ id: equip.id, nome: equip.nome })}
                 className="shrink-0 rounded-lg p-2 text-red-600 active:bg-red-50"
                 aria-label={`Excluir ${equip.nome}`}
               >
@@ -459,6 +480,19 @@ function EditorEquipamentos({
             </div>
           ))}
         </div>
+      )}
+
+      {confirmando && (
+        <ConfirmarExclusao
+          rotulo="equipamento"
+          nome={confirmando.nome}
+          onCancelar={() => setConfirmando(null)}
+          onConfirmar={() =>
+            excluir(
+              equipamentos.find((e) => e.id === confirmando.id) ?? ({ id: confirmando.id } as Equipamento),
+            )
+          }
+        />
       )}
     </div>
   )
@@ -565,6 +599,46 @@ function FormularioEquipamento({
         >
           Salvar
         </button>
+      </div>
+    </div>
+  )
+}
+
+/* ---------------------------- Confirmação ---------------------------- */
+
+function ConfirmarExclusao({
+  nome,
+  rotulo,
+  onCancelar,
+  onConfirmar,
+}: {
+  nome: string
+  rotulo: string
+  onCancelar: () => void
+  onConfirmar: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+        <h2 className="text-base font-bold text-slate-900">Excluir {rotulo}?</h2>
+        <p className="mt-2 text-sm text-slate-600">
+          <strong>{nome}</strong> será apagado do cadastro. Se ele já tem fichas executadas, o
+          histórico continua guardado, mas o cadastro não volta.
+        </p>
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={onCancelar}
+            className="flex-1 rounded-xl border-2 border-slate-300 py-3 text-sm font-semibold text-slate-700"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onConfirmar}
+            className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-semibold text-white"
+          >
+            Excluir
+          </button>
+        </div>
       </div>
     </div>
   )

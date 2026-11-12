@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import type { DefinicaoFicha, Execucao } from './types'
 import { db, gerarCodigo } from './lib/db'
 import { getFicha } from './config/fichas'
-import type { Equipamento } from './lib/cadastros'
+import { lerPessoas, type Equipamento } from './lib/cadastros'
+import { useSessao } from './lib/sessao'
 import TelaHome from './pages/TelaHome'
 import TelaIdentificacao from './pages/TelaIdentificacao'
 import TelaExecucao from './pages/TelaExecucao'
@@ -24,6 +25,7 @@ export default function App() {
   const [rota, setRota] = useState<Rota>({ nome: 'home' })
   const [online, setOnline] = useState(navigator.onLine)
   const { tema, alternar } = useTema()
+  const { sessao, entrar, sair, ehAdministrador } = useSessao()
 
   useEffect(() => {
     const on = () => setOnline(true)
@@ -49,6 +51,18 @@ export default function App() {
     },
     [],
   )
+
+  /** Revalida a sessão contra o cadastro: pessoa desativada ou rebaixada perde o acesso. */
+  const validarSessao = useCallback(async () => {
+    if (!sessao) return
+    const pessoas = await lerPessoas()
+    const pessoa = pessoas.find((p) => p.id === sessao.pessoaId)
+    if (!pessoa || !pessoa.ativo || pessoa.nivel !== sessao.nivel) sair()
+  }, [sessao, sair])
+
+  useEffect(() => {
+    void validarSessao()
+  }, [validarSessao])
 
   /**
    * Abre uma execução a partir do contator escolhido: a ficha e o local vêm do
@@ -123,13 +137,19 @@ export default function App() {
     case 'historico':
       return (
         <TelaHistorico
+          podeExcluir={ehAdministrador}
           onVoltar={() => setRota({ nome: 'home' })}
           onAbrir={(id) => void abrirExecucao(id)}
         />
       )
 
     case 'cadastros':
-      return <TelaCadastros onVoltar={() => setRota({ nome: 'home' })} />
+      return (
+        <TelaCadastros
+          administrador={ehAdministrador ? (sessao?.nome ?? '') : undefined}
+          onVoltar={() => setRota({ nome: 'home' })}
+        />
+      )
 
     case 'backup':
       return (
@@ -169,6 +189,10 @@ export default function App() {
       return (
         <TelaHome
           online={online}
+          sessao={sessao}
+          onEntrar={entrar}
+          onSair={sair}
+          ehAdministrador={ehAdministrador}
           onNovaExecucaoDoEquipamento={(equip) => void novaExecucaoDoEquipamento(equip)}
           onAbrirExecucao={(id) => void abrirExecucao(id)}
           onVerHistorico={() => setRota({ nome: 'historico' })}
