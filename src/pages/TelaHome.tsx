@@ -251,7 +251,7 @@ export default function TelaHome({
               Nenhum contator encontrado para "{busca}".
             </p>
           ) : (
-            <div className="space-y-2">
+            <div className="max-h-[22rem] space-y-2 overflow-y-auto overscroll-contain pr-1">
               {filtrados.map((equip) => {
                 const ficha = FICHAS.find((f) => f.id === equip.fichaId)
                 return (
@@ -277,6 +277,11 @@ export default function TelaHome({
                   </button>
                 )
               })}
+              {filtrados.length > 3 && (
+                <p className="pt-1 text-center text-[11px] text-slate-400">
+                  {filtrados.length} equipamentos — role a lista ou use a busca
+                </p>
+              )}
             </div>
           )}
         </section>
