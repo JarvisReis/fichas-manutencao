@@ -512,9 +512,6 @@ export default function TelaHome({
 
         {caixa === 'rascunho' && ultimas && ultimas.length > 0 && (
           <section>
-            <h2 className="mb-2 px-1 text-xs font-bold tracking-wide text-slate-500 uppercase">
-              Continuar
-            </h2>
             <div className="space-y-2">
               {rascunhosDoGrupo.map(({ exec, total }) => {
                 const nome = (exec.camposFixos.equipamento ?? '').trim()
