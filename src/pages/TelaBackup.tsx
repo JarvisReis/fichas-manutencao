@@ -14,9 +14,11 @@ import { enviarExecucao as enviarParaServidor, sincronizarPendentes } from '../l
 interface Props {
   onVoltar: () => void
   onRestaurado: () => void
+  /** reabrir ficha concluída exige administrador; usado no reenvio de correção */
+  ehAdministrador: boolean
 }
 
-export default function TelaBackup({ onVoltar, onRestaurado }: Props) {
+export default function TelaBackup({ onVoltar, onRestaurado, ehAdministrador }: Props) {
   const [mensagem, setMensagem] = useState<string | null>(null)
   const [processando, setProcessando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -57,7 +59,9 @@ export default function TelaBackup({ onVoltar, onRestaurado }: Props) {
     setMensagem(null)
     try {
       if (endpoint.trim()) {
-        const r = await enviarParaServidor(id, endpoint.trim())
+        const r = await enviarParaServidor(id, endpoint.trim(), {
+          reenvioAdmin: ehAdministrador,
+        })
         if (r.ok) {
           setMensagem('Execução sincronizada com o SharePoint.')
           await contarPendentes()

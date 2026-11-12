@@ -80,6 +80,8 @@ export interface Execucao {
   valores: ValorItem[]
   observacaoGeral?: string
   status: 'rascunho' | 'concluida'
+  /** pessoa que criou a execução — só ela usa a janela de correção de 24 h */
+  criadaPor?: string
   sincronizada: boolean
   criadaEm: string
   atualizadaEm: string

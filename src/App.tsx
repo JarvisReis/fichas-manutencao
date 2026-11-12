@@ -3,6 +3,7 @@ import type { DefinicaoFicha, Execucao } from './types'
 import { db, gerarCodigo } from './lib/db'
 import { getFicha } from './config/fichas'
 import { lerPessoas, type Equipamento } from './lib/cadastros'
+import { podeEditarExecucao } from './lib/permissoes'
 import { useSessao } from './lib/sessao'
 import TelaHome from './pages/TelaHome'
 import TelaIdentificacao from './pages/TelaIdentificacao'
@@ -83,6 +84,7 @@ export default function App() {
       dataHora: agora.toISOString(),
       valores: ficha.itens.map((item) => ({ itemId: item.id, valor: '' })),
       status: 'rascunho',
+      criadaPor: sessao?.pessoaId,
       sincronizada: false,
       criadaEm: agora.toISOString(),
       atualizadaEm: agora.toISOString(),
@@ -98,7 +100,7 @@ export default function App() {
   const abrirExecucao = async (id: string) => {
     const execucao = await db.execucoes.get(id)
     if (!execucao) return
-    if (execucao.status === 'concluida' && !ehAdministrador) return
+    if (!podeEditarExecucao(execucao, sessao, execucao.criadaPor).pode) return
     const ficha = getFicha(execucao.fichaId)
     if (!ficha) return
     setRota({ nome: 'execucao', ficha, execucao })
@@ -133,7 +135,7 @@ export default function App() {
         <TelaExecucao
           ficha={rota.ficha}
           execucao={rota.execucao}
-          podeAlterar={ehAdministrador || rota.execucao.status === 'rascunho'}
+          podeAlterar={podeEditarExecucao(rota.execucao, sessao, rota.execucao.criadaPor).pode}
           onVoltar={() => setRota({ nome: 'identificacao', ficha: rota.ficha, execucao: rota.execucao })}
           onAtualizar={(patch) => atualizarExecucao(rota.execucao.id, patch)}
           onSalvar={(status) => void salvarExecucao(rota.execucao.id, status)}
@@ -144,7 +146,7 @@ export default function App() {
       return (
         <TelaHistorico
           podeExcluir={ehAdministrador}
-          podeEditarConcluida={ehAdministrador}
+          sessao={sessao}
           onVoltar={() => setRota({ nome: 'home' })}
           onAbrir={(id) => void abrirExecucao(id)}
         />
@@ -180,6 +182,7 @@ export default function App() {
     case 'backup':
       return (
         <TelaBackup
+          ehAdministrador={ehAdministrador}
           onVoltar={() => setRota({ nome: 'home' })}
           onRestaurado={() => setRota({ nome: 'home' })}
         />

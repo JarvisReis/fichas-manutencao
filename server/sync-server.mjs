@@ -116,18 +116,51 @@ function camposDaExecucao(p) {
   }
 }
 
-async function jaExiste(listaId, execucaoId) {
+/**
+ * Procura a execução já gravada. Devolve o item (id + status) ou null.
+ * Serve para duas coisas: idempotência e recusa de alteração de ficha fechada.
+ */
+async function localizarExecucao(listaId, execucaoId) {
   const r = await graph(
     `/sites/${await idDoSite()}/lists/${listaId}/items?$filter=${encodeURIComponent(
       `fields/ExecucaoId eq '${execucaoId}'`,
-    )}&$expand=fields($select=id)&$top=1`,
+    )}&$expand=fields($select=id,Status)&$top=1`,
   )
-  return (r.value ?? []).length > 0
+  const item = r.value?.[0]
+  if (!item) return null
+  return { id: item.id, status: item.fields?.Status ?? '' }
 }
 
+/**
+ * Execução concluída é registro fechado no SharePoint: só administrador altera.
+ *
+ * Bloqueio vale para envio de ficha fechada que já existe na lista. O app manda
+ * `reenvioAdmin: true` quando quem corrigiu se identificou como administrador;
+ * sem essa marca, a linha existente manda — reenvio de aparelho de campo é
+ * recusado com 409, e o app avisa em vez de fingir que sincronizou.
+ */
 async function gravarExecucao(p) {
   const listaId = await idDaLista(LIST_EXECUCOES)
-  if (await jaExiste(listaId, p.id)) return { criado: false }
+  const existente = await localizarExecucao(listaId, p.id)
+  if (existente) {
+    const fechada = existente.status === 'concluida'
+    if (fechada && !p.reenvioAdmin) {
+      return { criado: false, recusado: 'concluida' }
+    }
+    // Concluída reaberta por administrador: atualiza as colunas da execução.
+    if (p.reenvioAdmin) {
+      const siteId = await idDoSite()
+      await graph(`/sites/${siteId}/lists/${listaId}/items/${existente.id}/fields`, {
+        method: 'PATCH',
+        body: JSON.stringify(camposDaExecucao(p)),
+      })
+      if (p.tipoManutencao === 'P2' && p.nucleoInstalado && p.equipamento) {
+        await atualizarContator(p.equipamento, p.nucleoInstalado)
+      }
+      return { criado: false, atualizado: true }
+    }
+    return { criado: false }
+  }
 
   const siteId = await idDoSite()
   await graph(`/sites/${siteId}/lists/${listaId}/items`, {
@@ -218,7 +251,16 @@ const servidor = http.createServer(async (req, res) => {
       if (!payload.id) return json(res, 400, { erro: 'execução sem id' })
 
       const r = await gravarExecucao(payload)
-      console.log(`${r.criado ? 'gravada' : 'ignorada'} ${payload.codigo} (${payload.id})`)
+      if (r.recusado === 'concluida') {
+        console.log(`recusada ${payload.codigo} (${payload.id}): concluída no SharePoint`)
+        return json(res, 409, {
+          ok: false,
+          erro: 'execução já concluída no SharePoint; correção exige administrador',
+        })
+      }
+      console.log(
+        `${r.criado ? 'gravada' : r.atualizado ? 'atualizada' : 'ignorada'} ${payload.codigo} (${payload.id})`,
+      )
       return json(res, r.criado ? 201 : 200, { ok: true, ...r })
     }
 

@@ -130,6 +130,7 @@ export interface ResultadoEnvio {
 export async function enviarExecucao(
   execucaoId: string,
   endpoint: string,
+  opcoes: { reenvioAdmin?: boolean } = {},
 ): Promise<{ ok: boolean; erro?: string }> {
   const payload = await montarEnvio(execucaoId)
   if (!payload) return { ok: false, erro: 'Execução não encontrada' }
@@ -138,7 +139,9 @@ export async function enviarExecucao(
     const resposta = await fetch(endpoint, {
       method: 'POST',
       headers: cabecalhos({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(payload),
+      // correção de ficha já concluída: só o app de administrador manda esta marca,
+      // e o servidor recusa o reenvio sem ela quando a linha está concluída.
+      body: JSON.stringify(opcoes.reenvioAdmin ? { ...payload, reenvioAdmin: true } : payload),
     })
     if (!resposta.ok) {
       const texto = await resposta.text().catch(() => '')

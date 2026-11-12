@@ -5,19 +5,21 @@ import { db } from '../lib/db'
 import { getFicha } from '../config/fichas'
 import { avaliarItem, valorExibido } from '../lib/conformidade'
 import { excluirExecucaoNoServidor, obterEndpointAdmin } from '../lib/sync'
+import { podeEditarExecucao, tempoRestanteJanela } from '../lib/permissoes'
+import type { Sessao } from '../lib/sessao'
 
 interface Props {
   /** só administrador apaga uma execução salva */
   podeExcluir: boolean
-  /** só administrador reabre uma ficha já concluída */
-  podeEditarConcluida: boolean
+  /** quem está no aparelho — define a janela de correção da ficha concluída */
+  sessao: Sessao | null
   onVoltar: () => void
   onAbrir: (id: string) => void
 }
 
 export default function TelaHistorico({
   podeExcluir,
-  podeEditarConcluida,
+  sessao,
   onVoltar,
   onAbrir,
 }: Props) {
@@ -180,21 +182,31 @@ export default function TelaHistorico({
 
               {(() => {
                 const concluida = exec.status === 'concluida'
-                const liberado = !concluida || podeEditarConcluida
-                if (!liberado) {
+                const permissao = podeEditarExecucao(exec, sessao, exec.criadaPor)
+                if (!permissao.pode) {
                   return (
                     <p className="mt-3 rounded-xl bg-slate-100 px-3 py-2 text-center text-[11px] font-medium text-slate-600">
-                      Concluída — só administrador reabre para corrigir.
+                      Concluída — a janela de correção fechou. Só administrador reabre.
                     </p>
                   )
                 }
+                const resta = concluida ? tempoRestanteJanela(exec) : ''
                 return (
-                  <button
-                    onClick={() => onAbrir(exec.id)}
-                    className="mt-3 w-full rounded-xl border-2 border-slate-300 py-2.5 text-xs font-semibold text-slate-700 active:bg-slate-100"
-                  >
-                    {concluida ? 'Reabrir e corrigir' : 'Abrir e editar'}
-                  </button>
+                  <>
+                    <button
+                      onClick={() => onAbrir(exec.id)}
+                      className="mt-3 w-full rounded-xl border-2 border-slate-300 py-2.5 text-xs font-semibold text-slate-700 active:bg-slate-100"
+                    >
+                      {permissao.motivo === 'administrador'
+                        ? 'Reabrir e corrigir'
+                        : 'Abrir e editar'}
+                    </button>
+                    {resta && (
+                      <p className="mt-1 text-center text-[10px] text-slate-500">
+                        Sua janela de correção fecha em {resta}.
+                      </p>
+                    )}
+                  </>
                 )
               })()}
             </div>
