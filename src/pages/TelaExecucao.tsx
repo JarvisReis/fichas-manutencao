@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Camera, Check, Infinity as Inf, Plus, Save, Trash2, X } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Camera, Check, Infinity as Inf, Plus, Save, Trash2, X } from 'lucide-react'
 import type { DefinicaoFicha, Execucao, Foto, Marca, ValorItem } from '../types'
 import { avaliarItem } from '../lib/conformidade'
 import { comprimirImagem, db } from '../lib/db'
@@ -307,6 +307,29 @@ export default function TelaExecucao({
                         aria-label="Valor infinito"
                       >
                         <Inf size={22} />
+                      </button>
+                    )}
+                    {/*
+                      Teclado numérico de campo (o de três linhas) não tem tecla de
+                      ação — nem "Próximo" nem "Concluído". Esta seta é o avanço:
+                      grava o foco no próximo campo, e no último fecha o teclado.
+                    */}
+                    {podeAlterar && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (posicao === totalMedicoes - 1) {
+                            camposRef.current[posicao]?.blur()
+                          } else {
+                            focarCampo(posicao + 1)
+                          }
+                        }}
+                        className="flex w-12 items-center justify-center rounded-xl border-2 border-slate-300 bg-white text-slate-600 active:bg-slate-100"
+                        aria-label={
+                          posicao === totalMedicoes - 1 ? 'Fechar teclado' : 'Próximo campo'
+                        }
+                      >
+                        {posicao === totalMedicoes - 1 ? <Check size={22} /> : <ChevronDown size={22} />}
                       </button>
                     )}
                   </div>
