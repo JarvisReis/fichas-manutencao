@@ -130,6 +130,36 @@ export function gerarCodigo(
   return `${base} ${hora}`
 }
 
+/**
+ * Ficha zerada de um equipamento recém-cadastrado.
+ *
+ * É um rascunho vazio: existe para o equipamento aparecer com ficha pendente na
+ * home e no histórico desde o primeiro dia, e para o técnico ter de onde partir.
+ * Todas as medições nascem em branco — não é dado falso, é ficha aberta.
+ */
+export function fichaZerada(
+  equipamento: { nome: string; local?: string; fichaId: string },
+  ficha: { id: string; tiposManutencao: string[]; itens: { id: string }[] },
+): Execucao {
+  const agora = new Date()
+  return {
+    id: crypto.randomUUID(),
+    codigo: gerarCodigo(equipamento.nome.trim(), agora, []),
+    fichaId: ficha.id,
+    marca: undefined,
+    tipoManutencao: ficha.tiposManutencao[0] as Execucao['tipoManutencao'],
+    cabecalho: {},
+    camposFixos: { equipamento: equipamento.nome.trim() },
+    local: equipamento.local ?? '',
+    dataHora: agora.toISOString(),
+    valores: ficha.itens.map((item) => ({ itemId: item.id, valor: '' })),
+    status: 'rascunho',
+    sincronizada: false,
+    criadaEm: agora.toISOString(),
+    atualizadaEm: agora.toISOString(),
+  }
+}
+
 /** "12–13/11/2026" quando o mês/ano é o mesmo; senão, as duas datas inteiras. */
 function intervalo(inicio: Date, fim: Date): string {
   const mesmaReferencia =

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, Pencil, Plus, Trash2, Users, Wrench, X } from 'lucide-react'
-import { FICHAS } from '../config/fichas'
+import { FICHAS, getFicha } from '../config/fichas'
 import {
   gravarEquipamentos,
   gravarPessoas,
@@ -12,6 +12,7 @@ import {
   type Pessoa,
 } from '../lib/cadastros'
 import { ShieldCheck, User as UserIcon, CloudUpload, CloudOff } from 'lucide-react'
+import { db, fichaZerada } from '../lib/db'
 import { enviarEquipamentos, enviarPessoas } from '../lib/sync'
 import { gravarVersao } from '../lib/cadastros'
 import { obterEndpointAdmin } from '../lib/sync'
@@ -75,8 +76,25 @@ export default function TelaCadastros({ onVoltar, administrador }: Props) {
     )
   }
 
+  /**
+   * Equipamento novo nasce com a ficha zerada na lista: o técnico não precisa
+   * "criar" a primeira manutenção, ela já aparece como rascunho na home e no
+   * histórico. Equipamento que só foi editado não ganha ficha nova.
+   */
   const salvarEquipamentos = async (lista: Equipamento[]) => {
+    const anteriores = new Set(equipamentos.map((e) => e.id))
+    const novos = lista.filter((e) => !anteriores.has(e.id))
     setEquipamentos(lista)
+    for (const equip of novos) {
+      const ficha = getFicha(equip.fichaId)
+      if (!ficha) continue
+      const jaTem = await db.execucoes
+        .where('fichaId')
+        .equals(ficha.id)
+        .filter((e) => (e.camposFixos.equipamento ?? '').trim() === equip.nome.trim())
+        .count()
+      if (jaTem === 0) await db.execucoes.put(fichaZerada(equip, ficha))
+    }
     await publicar(
       () => enviarEquipamentos(obterEndpointAdmin(), lista),
       () => gravarEquipamentos(lista),
