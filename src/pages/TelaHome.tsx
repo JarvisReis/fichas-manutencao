@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { AlertTriangle, ChevronRight, Clock, CloudOff, Database, HardDriveDownload, Moon, Search, Sun, Users, Wifi, X } from 'lucide-react'
+import { AlertTriangle, ChevronRight, Clock, CloudOff, Database, HardDriveDownload, Menu, Moon, Search, Sun, Users, Wifi, X } from 'lucide-react'
 import { db } from '../lib/db'
 import { FICHAS, GRUPOS, grupoDaFicha } from '../config/fichas'
 import { lerEquipamentos, normalizar, type Equipamento } from '../lib/cadastros'
@@ -76,6 +76,23 @@ export default function TelaHome({
     return mapa
   }, [todas])
 
+  /**
+   * Os três equipamentos com manutenção mais antiga — os que estão devendo
+   * serviço. É a leitura inversa do topo da lista: o que está há mais tempo sem
+   * atendimento. Rascunho não entra (não é manutenção encerrada).
+   */
+  const maisAntigos = useMemo(() => {
+    const mapa = new Map<string, (typeof todas)[number]>()
+    const ordenadas = [...(todas ?? [])]
+      .filter((e) => e.status !== 'rascunho')
+      .sort((a, b) => Date.parse(a.dataHora) - Date.parse(b.dataHora))
+    for (const exec of ordenadas) {
+      const nome = exec.camposFixos.equipamento?.trim()
+      if (nome && !mapa.has(nome)) mapa.set(nome, exec)
+    }
+    return [...mapa.values()].slice(0, 3)
+  }, [todas])
+
   /** Os três equipamentos com manutenção mais recente: a lista começa por eles. */
   const ultimosEquipamentos = useMemo(() => {
     const ordem = [...(todas ?? [])]
@@ -89,6 +106,8 @@ export default function TelaHome({
     }
     return nomes
   }, [todas])
+
+  const [menuAberto, setMenuAberto] = useState(false)
 
   // A aba escolhida sobrevive ao recarregar e a voltar de uma ficha concluída:
   // quem está na seccionadora não quer cair em contator toda vez.
@@ -148,7 +167,7 @@ export default function TelaHome({
 
   return (
     <div className="min-h-full pb-10">
-      <header className="bg-gradient-to-br from-blue-800 to-blue-600 px-5 pt-8 pb-7 text-white">
+      <header className="relative bg-gradient-to-br from-blue-800 to-blue-600 px-5 pt-8 pb-7 text-white">
         <div className="mb-1 flex items-center justify-between">
           <p className="text-xs font-medium tracking-wide text-blue-100 uppercase">Metrô · Manutenção</p>
           <div className="flex items-center gap-2">
@@ -160,6 +179,15 @@ export default function TelaHome({
           >
             {temaEscuro ? <Sun size={15} /> : <Moon size={15} />}
           </button>
+          <button
+            onClick={() => setMenuAberto((v) => !v)}
+            className="rounded-full bg-white/15 p-1.5 text-white active:bg-white/25"
+            aria-label="Menu"
+            aria-expanded={menuAberto}
+            title="Menu"
+          >
+            {menuAberto ? <X size={16} /> : <Menu size={16} />}
+          </button>
           <span
             className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
               online ? 'bg-emerald-500/20 text-emerald-100' : 'bg-amber-500/25 text-amber-50'
@@ -170,6 +198,44 @@ export default function TelaHome({
           </span>
           </div>
         </div>
+        {menuAberto && (
+          <>
+            {/* toque fora fecha o menu, como qualquer menu nativo */}
+            <button
+              className="fixed inset-0 z-30 cursor-default"
+              aria-label="Fechar menu"
+              onClick={() => setMenuAberto(false)}
+            />
+            <div className="absolute right-4 z-40 mt-1 w-60 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
+              <MenuItem
+                icone={<Database size={18} />}
+                rotulo="Histórico e fila de envio"
+                onClick={() => {
+                  setMenuAberto(false)
+                  onVerHistorico()
+                }}
+              />
+              <MenuItem
+                icone={<HardDriveDownload size={18} />}
+                rotulo="Backup das execuções"
+                onClick={() => {
+                  setMenuAberto(false)
+                  onVerBackup()
+                }}
+              />
+              {ehAdministrador && (
+                <MenuItem
+                  icone={<Users size={18} />}
+                  rotulo="Equipe e equipamentos"
+                  onClick={() => {
+                    setMenuAberto(false)
+                    onVerCadastros()
+                  }}
+                />
+              )}
+            </div>
+          </>
+        )}
         <h1 className="text-2xl font-bold">Fichas de medição</h1>
         <p className="mt-1 text-sm text-blue-100">
           {naoSincronizadas > 0
@@ -286,6 +352,51 @@ export default function TelaHome({
           )}
         </section>
 
+        {maisAntigos.length > 0 && (
+          <section>
+            <h2 className="mb-2 px-1 text-xs font-bold tracking-wide text-slate-500 uppercase">
+              Tempo sem manutenção
+            </h2>
+            <p className="mb-2 px-1 text-xs text-slate-500">
+              Os três que passaram mais tempo sem serviço — vale dar prioridade.
+            </p>
+            <div className="space-y-2">
+              {maisAntigos.map((exec) => {
+                const nome = (exec.camposFixos.equipamento ?? '').trim()
+                const equip = equipamentos.find((e) => e.nome.trim() === nome)
+                const quando = new Date(exec.dataHora)
+                const meses = Math.max(
+                  0,
+                  Math.floor((Date.now() - quando.getTime()) / (1000 * 60 * 60 * 24 * 30.44)),
+                )
+                return (
+                  <button
+                    key={exec.id}
+                    onClick={() =>
+                      equip ? onNovaExecucaoDoEquipamento(equip) : onAbrirExecucao(exec.id)
+                    }
+                    className="flex w-full items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-3.5 text-left"
+                  >
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                      <Clock size={18} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-slate-900">
+                        {nome || exec.codigo}
+                      </span>
+                      <span className="block text-xs text-slate-600">
+                        última: {quando.toLocaleDateString('pt-BR')} ·{' '}
+                        {meses === 0 ? 'menos de 1 mês' : `${meses} ${meses === 1 ? 'mês' : 'meses'}`}
+                      </span>
+                    </span>
+                    <ChevronRight size={18} className="shrink-0 text-amber-600" />
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
         {ultimas && ultimas.length > 0 && (
           <section>
             <h2 className="mb-2 px-1 text-xs font-bold tracking-wide text-slate-500 uppercase">
@@ -335,41 +446,6 @@ export default function TelaHome({
         )}
 
         <section className="space-y-2">
-          <button
-            onClick={onVerHistorico}
-            className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 text-left"
-          >
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
-              <Database size={20} />
-            </span>
-            <span className="flex-1 text-sm font-medium text-slate-800">Histórico e fila de envio</span>
-            <ChevronRight size={18} className="text-slate-400" />
-          </button>
-
-          <button
-            onClick={onVerBackup}
-            className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 text-left"
-          >
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
-              <HardDriveDownload size={20} />
-            </span>
-            <span className="flex-1 text-sm font-medium text-slate-800">Backup das execuções</span>
-            <ChevronRight size={18} className="text-slate-400" />
-          </button>
-
-          {ehAdministrador && (
-            <button
-              onClick={onVerCadastros}
-              className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 text-left"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
-                <Users size={20} />
-              </span>
-              <span className="flex-1 text-sm font-medium text-slate-800">Equipe e equipamentos</span>
-              <ChevronRight size={18} className="text-slate-400" />
-            </button>
-          )}
-
           {naoSincronizadas > 0 && (
             <div className="flex items-start gap-2 rounded-2xl border border-amber-300 bg-amber-50 p-3.5 text-xs text-amber-900">
               <AlertTriangle size={16} className="mt-0.5 shrink-0" />
@@ -418,5 +494,27 @@ function UltimaManutencao({ exec }: { exec: Execucao | undefined }) {
         {exec.status === 'pendente' ? 'PENDENTE' : 'CONCLUÍDA'}
       </span>
     </span>
+  )
+}
+
+/** Item do menu suspenso do cabeçalho. */
+function MenuItem({
+  icone,
+  rotulo,
+  onClick,
+}: {
+  icone: React.ReactNode
+  rotulo: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex w-full items-center gap-3 border-b border-slate-100 px-4 py-3 text-left last:border-0 active:bg-slate-50"
+    >
+      <span className="text-slate-500">{icone}</span>
+      <span className="flex-1 text-sm font-medium text-slate-800">{rotulo}</span>
+      <ChevronRight size={16} className="text-slate-400" />
+    </button>
   )
 }
