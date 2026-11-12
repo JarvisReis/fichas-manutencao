@@ -398,10 +398,12 @@ export default function TelaHome({
                         {[equip.local, equip.marca, equip.serie].filter(Boolean).join(' · ') ||
                           'sem detalhes'}
                       </span>
-                      <span className="mt-0.5 block text-[11px] font-medium text-blue-700">
-                        {ficha ? ficha.nomeCurto : 'ficha não definida'}
+                      <span className="mt-1.5 flex flex-wrap items-center gap-1">
+                        <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">
+                          {ficha ? ficha.nomeCurto.toUpperCase() : 'FICHA NÃO DEFINIDA'}
+                        </span>
+                        <UltimaManutencao exec={ultimaPorEquipamento.get(equip.nome)} />
                       </span>
-                      <UltimaManutencao exec={ultimaPorEquipamento.get(equip.nome)} />
                     </span>
                     <ChevronRight size={18} className="shrink-0 text-slate-400" />
                   </button>
@@ -550,8 +552,8 @@ export default function TelaHome({
 function UltimaManutencao({ exec }: { exec: Execucao | undefined }) {
   if (!exec) {
     return (
-      <span className="mt-1.5 flex items-center gap-1 text-[11px] text-slate-500">
-        <Clock size={11} /> sem manutenção registrada
+      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-500">
+        SEM MANUTENÇÃO
       </span>
     )
   }
@@ -561,21 +563,21 @@ function UltimaManutencao({ exec }: { exec: Execucao | undefined }) {
     year: '2-digit',
   })
   return (
-    <span className="mt-1.5 flex flex-wrap items-center gap-1">
-      <span className="rounded bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white">
-        {exec.tipoManutencao ?? '—'}
-      </span>
-      <span className="text-[11px] text-slate-600">{quando}</span>
+    <>
       <span
         className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${
           exec.status === 'pendente'
-            ? 'bg-red-600 text-white'
+            ? 'bg-red-100 text-red-800'
             : 'bg-emerald-100 text-emerald-800'
         }`}
       >
         {exec.status === 'pendente' ? 'PENDENTE' : 'CONCLUÍDA'}
       </span>
-    </span>
+      <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">
+        {exec.tipoManutencao ?? '—'}
+      </span>
+      <span className="text-[11px] text-slate-600">{quando}</span>
+    </>
   )
 }
 
