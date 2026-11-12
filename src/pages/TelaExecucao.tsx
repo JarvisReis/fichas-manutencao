@@ -436,7 +436,7 @@ export default function TelaExecucao({
             ) : (
               <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 py-3 text-xs font-semibold text-slate-600 active:scale-[0.99]">
                 <Camera size={16} />
-                {carregandoFoto === 'observacao' ? 'Processando…' : 'Adicionar foto (opcional)'}
+                {carregandoFoto === 'observacao' ? 'Processando…' : 'Foto (opcional)'}
                 <input
                   type="file"
                   accept="image/*"
