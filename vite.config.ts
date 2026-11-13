@@ -35,9 +35,12 @@ export default defineConfig({
         // aparecia no aparelho e parecia que nada tinha sido corrigido.
         globPatterns: ['**/*.{js,css,svg,png,woff2}'],
         globIgnores: ['**/index.html', '**/registerSW.js'],
-        // Sem `navigateFallback`, a navegação vai sempre à rede primeiro.
-        // Offline continua funcionando pela rota `NetworkFirst` abaixo, que cai
-        // no cache quando não há sinal.
+        // A navegação vai à rede primeiro e cai no cache quando não há sinal.
+        // O `navigateFallback` PRECISA ser nulo: com o padrão do plugin ele
+        // registra uma rota que serve `index.html` do precache — mas o arquivo
+        // foi tirado do precache, então a rota responde erro e o app não abre
+        // offline.
+        navigateFallback: null,
         cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
