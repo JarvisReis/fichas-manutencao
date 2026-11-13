@@ -582,11 +582,6 @@ export default function TelaHome({
                             {total} EM ABERTO
                           </span>
                         )}
-                        {!exec.sincronizada && (
-                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-500">
-                            NÃO ENVIADO
-                          </span>
-                        )}
                       </span>
                     </span>
                     <ChevronRight size={18} className="shrink-0 text-slate-400" />
