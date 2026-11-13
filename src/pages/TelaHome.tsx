@@ -453,7 +453,9 @@ export default function TelaHome({
                             <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800">
                               {ultima.tipoManutencao ?? '—'}
                             </span>
-                            <span className="text-[11px] text-slate-600">{quandoDaUltima}</span>
+                            <span className="flex items-center py-0.5 text-[11px] text-slate-600">
+                              {quandoDaUltima}
+                            </span>
                           </>
                         )}
                         {naoEnviadas.has(equip.nome.trim()) && (
@@ -576,7 +578,9 @@ export default function TelaHome({
                         <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-800">
                           RASCUNHO
                         </span>
-                        <span className="text-[11px] text-slate-600">{quando}</span>
+                        <span className="flex items-center py-0.5 text-[11px] text-slate-600">
+                          {quando}
+                        </span>
                         {total > 1 && (
                           <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-600">
                             {total} EM ABERTO
