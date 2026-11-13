@@ -444,7 +444,7 @@ export default function TelaHome({
                         {equip.nome}
                       </span>
                       <span className="block truncate text-xs text-slate-500">
-                        {[equip.local, equip.serie].filter(Boolean).join(' · ') || 'sem detalhes'}
+                        {equip.local?.trim() || 'sem detalhes'}
                       </span>
                       <span className="mt-1.5 flex flex-wrap items-center gap-1">
                         <UltimaManutencao exec={ultima} />
@@ -520,7 +520,7 @@ export default function TelaHome({
                       </span>
                       <span className="block truncate text-xs text-slate-500">
                         {equip
-                          ? [equip.local, equip.serie].filter(Boolean).join(' · ') || 'sem detalhes'
+                          ? equip.local?.trim() || 'sem detalhes'
                           : exec.local || 'sem detalhes'}
                       </span>
                       <span className="mt-1.5 flex flex-wrap items-center gap-1">
@@ -551,12 +551,9 @@ export default function TelaHome({
               {rascunhosDoGrupo.map(({ exec, total }) => {
                 const nome = (exec.camposFixos.equipamento ?? '').trim()
                 const equip = equipamentos.find((e) => e.nome.trim() === nome)
-                const quando = new Date(exec.atualizadaEm).toLocaleString('pt-BR', {
-                  day: '2-digit',
-                  month: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })
+                // data curta no cartão: a hora não cabe ao lado das etiquetas e
+                // empurrava o "NÃO ENVIADO" para uma linha extra
+                const quando = new Date(exec.atualizadaEm).toLocaleDateString('pt-BR')
                 return (
                   <button
                     key={exec.id}
@@ -572,7 +569,7 @@ export default function TelaHome({
                       </span>
                       <span className="block truncate text-xs text-slate-500">
                         {equip
-                          ? [equip.local, equip.serie].filter(Boolean).join(' · ') || 'sem detalhes'
+                          ? equip.local?.trim() || 'sem detalhes'
                           : exec.local || 'sem detalhes'}
                       </span>
                       <span className="mt-1.5 flex flex-wrap items-center gap-1">
