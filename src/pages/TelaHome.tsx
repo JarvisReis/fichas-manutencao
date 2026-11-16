@@ -226,8 +226,11 @@ export default function TelaHome({
   return (
     <div className="min-h-full pb-10">
       <header className="relative bg-gradient-to-br from-blue-800 to-blue-600 px-5 pt-8 pb-7 text-white">
-        <div className="mb-1 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        {/* Duas pontas: à esquerda o status e quem está usando; à direita,
+            isolados, o tema e o menu. Sem isso os cinco controles ficam
+            colados na mesma fita e o alvo do dedo encosta um no outro. */}
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
           <span
             className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
               online ? 'bg-emerald-500/20 text-emerald-100' : 'bg-amber-500/25 text-amber-50'
@@ -236,25 +239,8 @@ export default function TelaHome({
             {online ? <Wifi size={12} /> : <CloudOff size={12} />}
             {online ? 'Online' : 'Offline'}
           </span>
-          <button
-            onClick={onAlternarTema}
-            className="rounded-full bg-white/15 p-1.5 text-white active:bg-white/25"
-            aria-label={temaEscuro ? 'Ativar modo claro' : 'Ativar modo escuro'}
-            title={temaEscuro ? 'Modo claro' : 'Modo escuro'}
-          >
-            {temaEscuro ? <Sun size={15} /> : <Moon size={15} />}
-          </button>
-          <button
-            onClick={() => setMenuAberto((v) => !v)}
-            className="rounded-full bg-white/15 p-1.5 text-white active:bg-white/25"
-            aria-label="Menu"
-            aria-expanded={menuAberto}
-            title="Menu"
-          >
-            {menuAberto ? <X size={16} /> : <Menu size={16} />}
-          </button>
           {/* Identificação curta no cabeçalho: nome de quem está usando. Sair
-              fica logo depois do menu, como pedido. */}
+              fica logo depois do nome, como pedido. */}
           {sessao && (
             <span className="flex min-w-0 max-w-[7.5rem] items-center gap-1 rounded-full bg-white/15 px-2 py-1 text-[10px] font-semibold text-white">
               {ehAdministrador ? <ShieldCheck size={12} className="shrink-0" /> : <UserIcon size={12} className="shrink-0" />}
@@ -280,6 +266,25 @@ export default function TelaHome({
               <LogIn size={15} />
             </button>
           )}
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={onAlternarTema}
+            className="rounded-full bg-white/15 p-1.5 text-white active:bg-white/25"
+            aria-label={temaEscuro ? 'Ativar modo claro' : 'Ativar modo escuro'}
+            title={temaEscuro ? 'Modo claro' : 'Modo escuro'}
+          >
+            {temaEscuro ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
+          <button
+            onClick={() => setMenuAberto((v) => !v)}
+            className="rounded-full bg-white/15 p-1.5 text-white active:bg-white/25"
+            aria-label="Menu"
+            aria-expanded={menuAberto}
+            title="Menu"
+          >
+            {menuAberto ? <X size={16} /> : <Menu size={16} />}
+          </button>
           </div>
         </div>
         {menuAberto && (
