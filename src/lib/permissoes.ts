@@ -98,7 +98,9 @@ export function validadeDoRascunho(execucao: ExecucaoMinima, agora: number = Dat
  * virar atalho: entrar em medições com equipe incompleta produz ficha que não
  * pode ser concluída depois, e o técnico só descobre no fim.
  *
- * O tipo nunca barra: o contrato é "não escolheu, salva como P1".
+ * O tipo NUNCA barra: o contrato é "não escolheu, salva como P1". Foi assim
+ * desde o começo e é o que evita técnico preso numa tela por um campo que o
+ * app já sabe preencher sozinho — o primeiro tipo da ficha é o padrão.
  */
 export interface IdentificacaoMinima {
   local?: string
@@ -116,6 +118,5 @@ export function identificacaoCompleta(
   if (local.length === 0) return false
   if (equipe < 2) return false
   if (opcoes.exigeMarca && !(execucao.marca ?? '').trim()) return false
-  if (!execucao.tipoManutencao) return false
   return true
 }

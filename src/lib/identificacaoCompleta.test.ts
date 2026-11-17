@@ -32,8 +32,8 @@ describe('identificacaoCompleta', () => {
     )
   })
 
-  it('barra sem tipo de manutenção', () => {
-    expect(identificacaoCompleta({ ...base, tipoManutencao: undefined })).toBe(false)
+  it('NÃO barra sem tipo: não escolheu vale P1', () => {
+    expect(identificacaoCompleta({ ...base, tipoManutencao: undefined })).toBe(true)
   })
 
   it('só exige marca quando a ficha exige', () => {
