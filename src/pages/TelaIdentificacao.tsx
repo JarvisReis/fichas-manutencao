@@ -12,6 +12,8 @@ import { lerNucleoDoServidor } from '../lib/sync'
 import {
   lerEquipamentos,
   lerPessoas,
+  RG_VALIDO,
+  rgValido,
   type Equipamento,
   type Pessoa,
 } from '../lib/cadastros'
@@ -123,12 +125,22 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
   const selecionarPessoa = (pessoa: Pessoa) => {
     // A pessoa escolhida pode vir do cadastro ainda sem RG preenchido; sem
     // identidade não dá para gravar a equipe e o botão nunca libera.
-    if (!pessoa.rg || !pessoa.rg.trim()) {
+    const rgLimpo = (pessoa.rg ?? '').trim()
+    if (!rgLimpo) {
       setAvisoEquipe('Esta pessoa está sem RG no cadastro. Peça a um administrador para preencher.')
       return
     }
+    // Mesma regra do cadastro. Antes daqui a validação era mais dura que a do
+    // formulário: RG com letra era gravado e descartado na volta, e o toque
+    // simplesmente não marcava — sem mensagem nenhuma.
+    if (!rgValido(rgLimpo)) {
+      setAvisoEquipe(
+        `O RG "${rgLimpo}" não é aceito. Precisa ter ao menos um número e no máximo 20 caracteres.`,
+      )
+      return
+    }
     setAvisoEquipe(null)
-    const rg = pessoa.rg.trim()
+    const rg = rgLimpo
     const atuais = extrairRgs(camposFixos)
     const jaEsta = atuais.some((r) => r.trim() === rg)
     const proximos = jaEsta ? atuais.filter((r) => r.trim() !== rg) : [...atuais, rg]
@@ -476,15 +488,22 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
  * RGs da equipe, na ordem rg1..rg6.
  *
  * Campos `rgN` de fichas antigas podem carregar lixo (espaço, vírgula, RG de
- * pessoa que saiu do cadastro). Aqui só passa o que tem cara de RG — dígitos,
- * com pontuação comum — para a lista da equipe não exibir entrada sem nome.
+ * pessoa que saiu do cadastro). Aqui só passa o que tem cara de RG.
+ *
+ * A regra é frouxa de propósito: basta ter ao menos um dígito e não ser um
+ * valor claramente quebrado. A versão anterior exigia começar com dígito
+ * (`/^[0-9][0-9.\-/]*$/`), o que descartava RG com prefixo de estado —
+ * `MG-12345`, `SP1234567`. Efeito colateral: a pessoa aparecia na seleção,
+ * o toque era gravado, e o valor era jogado fora na releitura — o botão
+ * nunca marcava e a tela não dizia por quê. Formato de RG é assunto do
+ * cadastro (que avisa), não do filtro (que descarta em silêncio).
  */
 function extrairRgs(camposFixos: Record<string, string>): string[] {
   const vistos = new Set<string>()
   const lista: string[] = []
   for (let i = 1; i <= 6; i++) {
     const bruto = (camposFixos[`rg${i}`] ?? '').trim()
-    if (!bruto || !/^[0-9][0-9.\-/]*$/.test(bruto) || !/[0-9]/.test(bruto)) continue
+    if (!RG_VALIDO.test(bruto)) continue
     const chave = bruto.replace(/[^0-9a-z]/gi, '').toLowerCase()
     if (vistos.has(chave)) continue
     vistos.add(chave)

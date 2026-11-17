@@ -128,3 +128,22 @@ export async function aplicarCadastrosDoServidor(dados: {
   await gravarVersao(dados.versao)
   return true
 }
+
+/**
+ * O que conta como RG.
+ *
+ * Mora aqui — e não dentro de uma tela — porque cadastro e execução precisam
+ * concordar. A versão antiga do filtro de execução exigia começar com dígito
+ * (`/^[0-9][0-9.\-/]*$/`), mas o formulário de cadastro aceitava qualquer
+ * texto: RG com prefixo de estado (`MG-12345`, `SP1234567`) era gravado e
+ * depois descartado em silêncio na hora de montar a equipe — a pessoa
+ * aparecia na lista, o toque não marcava, e nada explicava o motivo.
+ *
+ * Regra: de 2 a 20 caracteres, com ao menos um dígito, sem caractere de
+ * controle. Aceita letras, números, ponto, hífen, barra e espaço — os formatos
+ * que aparecem de fato em RG brasileiro.
+ */
+export const RG_VALIDO = /^(?=.*\d)[0-9A-Za-zÀ-ÿ][0-9A-Za-zÀ-ÿ.\-/ ]{1,19}$/
+
+export const rgValido = (rg: string | undefined | null): boolean =>
+  RG_VALIDO.test((rg ?? '').trim())

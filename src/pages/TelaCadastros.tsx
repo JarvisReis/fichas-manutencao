@@ -7,6 +7,7 @@ import {
   lerEquipamentos,
   lerPessoas,
   novoId,
+  rgValido,
   type Equipamento,
   type NivelAcesso,
   type Pessoa,
@@ -339,7 +340,10 @@ function FormularioPessoa({
   const [nivel, setNivel] = useState<NivelAcesso>(pessoa.nivel ?? 'usuario')
   const [ativo, setAtivo] = useState(pessoa.ativo)
 
-  const valido = nome.trim().length > 0 && rg.trim().length > 0
+  const valido = nome.trim().length > 0 && rgValido(rg)
+  // Só cobra o formato quando o campo já tem conteúdo — senão a tela nasce
+  // em vermelho num formulário em branco.
+  const rgInvalido = rg.trim().length > 0 && !rgValido(rg)
 
   return (
     <div className="rounded-xl border-2 border-blue-600 bg-white p-3">
@@ -368,8 +372,15 @@ function FormularioPessoa({
             value={rg}
             onChange={(e) => setRg(e.target.value)}
             placeholder="Ex.: 09233.9"
-            className="w-full rounded-lg border-2 border-slate-300 px-3 py-2.5 text-base text-slate-900 outline-none focus:border-blue-600"
+            className={`w-full rounded-lg border-2 px-3 py-2.5 text-base text-slate-900 outline-none focus:border-blue-600 ${
+              rgInvalido ? 'border-red-400 bg-red-50' : 'border-slate-300'
+            }`}
           />
+          {rgInvalido && (
+            <span className="mt-1 block text-[11px] font-medium text-red-700">
+              RG precisa ter ao menos um número — ex.: 09233.9 ou MG-12345.
+            </span>
+          )}
         </label>
         <label className="block">
           <span className="mb-1 block text-[11px] font-medium text-slate-600">Função (opcional)</span>
