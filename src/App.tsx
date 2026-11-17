@@ -81,12 +81,6 @@ export default function App() {
     })
   }
 
-  // Botão voltar do navegador/aparelho: a URL manda na tela.
-  useEffect(() => {
-    const aoMudarHash = () => setRotaState(rotaDaUrl())
-    window.addEventListener('hashchange', aoMudarHash)
-    return () => window.removeEventListener('hashchange', aoMudarHash)
-  }, [])
   const [online, setOnline] = useState(navigator.onLine)
   const { tema, alternar } = useTema()
   const { sessao, entrar, sair: sairSessao, ehAdministrador } = useSessao()
@@ -260,74 +254,62 @@ export default function App() {
   }
 
   /**
-   * Limpa rascunhos vencidos antes de restaurar qualquer tela.
+   * Aplica a rota que está na URL: recarregar ou voltar restaura a mesma tela.
    *
-   * Vem primeiro de propósito: se a URL aponta para um rascunho de 6 dias
-   * atrás, ele já não existe quando a restauração procura — e a queda para a
-   * home já é o comportamento esperado para execução que sumiu.
+   * A URL só guarda o id, então é preciso reler a execução e a ficha para
+   * remontar a rota. Se a execução sumiu (apagada em outro aparelho) ou a
+   * sessão não permite editar, cai na home sem barulho — restaurar não pode
+   * virar um erro na cara do técnico.
    */
-  const limpezaFeita = useRef(false)
-  useEffect(() => {
-    if (limpezaFeita.current) return
-    limpezaFeita.current = true
-    void (async () => {
-      // Sujeira de RG gravada por versão antiga: tira do banco antes de
-      // qualquer tela ler a ficha, senão o chip "Fora do cadastro" volta.
-      await limparRgOrgaoGravado().catch(() => {})
-      await limparRascunhosVencidos().catch(() => {})
-    })()
-  }, [])
+  const aplicarRotaDaUrl = useCallback(async () => {
+    const daUrl = rotaDaUrl()
+    const pendente = (daUrl as { pendente?: { nome: string; id: string } }).pendente
+    if (!pendente) {
+      setRotaState(daUrl)
+      return
+    }
+    const execucao = await db.execucoes.get(pendente.id)
+    if (!execucao) {
+      setRotaState({ nome: 'home' })
+      return
+    }
+    const ficha = getFicha(execucao.fichaId)
+    if (!ficha) {
+      setRotaState({ nome: 'home' })
+      return
+    }
+    if (pendente.nome === 'ficha') {
+      const equipamento = await equipamentoDaExecucao(execucao)
+      setRotaState({ nome: 'ficha', ficha, execucao, equipamento })
+      return
+    }
+    if (!podeEditarExecucao(execucao, sessao, execucao.criadaPor).pode) {
+      setRotaState({ nome: 'home' })
+      return
+    }
+    setRotaState({ nome: pendente.nome as 'identificacao' | 'execucao', ficha, execucao })
+  }, [sessao])
 
-  /**
-   * Restaura a tela que estava aberta quando a página foi recarregada.
-   *
-   * Roda uma vez, depois que o banco responde: a URL só guarda o id, e é
-   * preciso reler a execução e a ficha para remontar a rota. Se a execução
-   * sumiu (apagada em outro aparelho) ou a sessão não permite editar, cai na
-   * home sem barulho — restaurar não pode virar um erro na cara do técnico.
-   */
+  // Na abertura, depois da limpeza: a URL é a fonte da verdade.
   const restauracaoFeita = useRef(false)
   useEffect(() => {
     if (restauracaoFeita.current) return
-    const pendente = (rota as { pendente?: { nome: string; id: string } }).pendente
-    if (!pendente) {
-      restauracaoFeita.current = true
-      return
-    }
     restauracaoFeita.current = true
     void (async () => {
-      const execucao = await db.execucoes.get(pendente.id)
-      if (!execucao) {
-        setRotaState({ nome: 'home' })
-        return
-      }
-      const ficha = getFicha(execucao.fichaId)
-      if (!ficha) {
-        setRotaState({ nome: 'home' })
-        return
-      }
-      if (pendente.nome === 'identificacao') {
-        if (!podeEditarExecucao(execucao, sessao, execucao.criadaPor).pode) {
-          setRotaState({ nome: 'home' })
-          return
-        }
-        setRotaState({ nome: 'identificacao', ficha, execucao })
-        return
-      }
-      if (pendente.nome === 'execucao') {
-        if (!podeEditarExecucao(execucao, sessao, execucao.criadaPor).pode) {
-          setRotaState({ nome: 'home' })
-          return
-        }
-        setRotaState({ nome: 'execucao', ficha, execucao })
-        return
-      }
-      // 'ficha': registro concluído, aberto em leitura.
-      const equipamento = await equipamentoDaExecucao(execucao)
-      setRotaState({ nome: 'ficha', ficha, execucao, equipamento })
+      // Só depois da limpeza: um rascunho vencido não deve reabrir.
+      await limparRgOrgaoGravado().catch(() => {})
+      await limparRascunhosVencidos().catch(() => {})
+      await aplicarRotaDaUrl()
     })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- uma vez, na montagem
-  }, [])
+  }, [aplicarRotaDaUrl])
+
+  // Botão voltar do navegador/aparelho e mudança de hash: a URL manda na tela.
+  useEffect(() => {
+    const aoMudarHash = () => aplicarRotaDaUrl()
+    window.addEventListener('hashchange', aoMudarHash)
+    return () => window.removeEventListener('hashchange', aoMudarHash)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handler estável por render
+  }, [sessao])
 
   const salvarExecucao = async (id: string, status: Execucao['status']) => {
     const execucao = await db.execucoes.get(id)

@@ -62,7 +62,6 @@ export default function TelaExecucao({
 }: Props) {
   const [valores, setValores] = useState<ValorItem[]>(execucao.valores)
   const [obsGeral, setObsGeral] = useState(execucao.observacaoGeral ?? '')
-  const [fotos, setFotos] = useState<Record<string, string>>({})
   const [carregandoFoto, setCarregandoFoto] = useState<string | null>(null)
   const [fotoObservacaoUrl, setFotoObservacaoUrl] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
@@ -110,25 +109,22 @@ export default function TelaExecucao({
     campos[posicao]?.blur()
   }
 
-  // Carrega URLs de preview das fotos já salvas
+  // Foto é só da observação final. Fotos antigas presas a um item de medição
+  // são ignoradas aqui — a tela não mostra mais foto por item.
   useEffect(() => {
-    let cancelado = false
     const urls: string[] = []
 
     ;(async () => {
       const registros = await db.fotos.where('execucaoId').equals(execucao.id).toArray()
-      const mapa: Record<string, string> = {}
       for (const f of registros) {
+        if (f.itemId !== ITEM_OBSERVACAO) continue
         const url = URL.createObjectURL(f.blob)
         urls.push(url)
-        if (f.itemId === ITEM_OBSERVACAO) setFotoObservacaoUrl(url)
-        else mapa[f.itemId] = url
+        setFotoObservacaoUrl(url)
       }
-      if (!cancelado) setFotos(mapa)
     })()
 
     return () => {
-      cancelado = true
       urls.forEach((u) => URL.revokeObjectURL(u))
     }
   }, [execucao.id])
@@ -148,52 +144,6 @@ export default function TelaExecucao({
   }
 
   const valorDe = (itemId: string) => valores.find((v) => v.itemId === itemId)?.valor ?? ''
-
-  const tirarFoto = async (itemId: string, arquivo: File | undefined | null) => {
-    if (!arquivo) return
-    setCarregandoFoto(itemId)
-    try {
-      const blob = await comprimirImagem(arquivo)
-
-      // Remove foto anterior do mesmo item
-      const anteriores = await db.fotos.where('execucaoId').equals(execucao.id).toArray()
-      for (const antiga of anteriores.filter((f) => f.itemId === itemId)) {
-        await db.fotos.delete(antiga.id)
-      }
-
-      const foto: Foto = {
-        id: crypto.randomUUID(),
-        execucaoId: execucao.id,
-        itemId,
-        blob,
-        criadaEm: new Date().toISOString(),
-      }
-      await db.fotos.put(foto)
-
-      setFotos((atual) => {
-        if (atual[itemId]) URL.revokeObjectURL(atual[itemId])
-        return { ...atual, [itemId]: URL.createObjectURL(blob) }
-      })
-
-      aplicarValores(valores.map((v) => (v.itemId === itemId ? { ...v, fotoId: foto.id } : v)))
-    } catch (erro) {
-      setAviso(`Não foi possível processar a foto: ${(erro as Error).message}`)
-    } finally {
-      setCarregandoFoto(null)
-    }
-  }
-
-  const removerFoto = async (itemId: string) => {
-    const registros = await db.fotos.where('execucaoId').equals(execucao.id).toArray()
-    for (const f of registros.filter((r) => r.itemId === itemId)) await db.fotos.delete(f.id)
-    setFotos((atual) => {
-      const copia = { ...atual }
-      if (copia[itemId]) URL.revokeObjectURL(copia[itemId])
-      delete copia[itemId]
-      return copia
-    })
-    aplicarValores(valores.map((v) => (v.itemId === itemId ? { ...v, fotoId: undefined } : v)))
-  }
 
   const analises = ficha.itens.map((item) => ({
     item,
@@ -371,7 +321,6 @@ export default function TelaExecucao({
         {ficha.itens.map((item, indice) => {
           const analise = avaliarItem(item, valorDe(item.id), marca)
           const cores = corResultado[analise.resultado]
-          const fotoUrl = fotos[item.id]
           const posicao = comCampo.indexOf(item.id)
 
           return (
@@ -459,44 +408,6 @@ export default function TelaExecucao({
                       </button>
                     )}
                   </div>
-
-                  <div className="mt-3 flex items-center gap-2">
-                    <label className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-slate-300 bg-white py-2.5 text-xs font-semibold text-slate-700 active:scale-[0.99]">
-                      <Camera size={16} />
-                      {carregandoFoto === item.id
-                        ? 'Processando…'
-                        : fotoUrl
-                          ? 'Trocar foto'
-                          : 'Foto (opcional)'}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        className="hidden"
-                        onChange={(e) => {
-                          void tirarFoto(item.id, e.target.files?.[0])
-                          e.currentTarget.value = ''
-                        }}
-                      />
-                    </label>
-                    {fotoUrl && (
-                      <button
-                        onClick={() => void removerFoto(item.id)}
-                        className="rounded-xl border-2 border-slate-300 bg-white p-2.5 text-slate-600"
-                        aria-label="Remover foto"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    )}
-                  </div>
-
-                  {fotoUrl && (
-                    <img
-                      src={fotoUrl}
-                      alt={`Foto do item ${item.nome}`}
-                      className="mt-2 h-32 w-full rounded-xl border border-slate-200 object-cover"
-                    />
-                  )}
                 </>
               )}
             </section>
