@@ -239,7 +239,14 @@ export default function TelaHistorico({
                   ).resultado === "nao_conforme",
               ).length
             : 0;
-          const preenchidos = exec.valores.filter((v) => v.valor !== "").length;
+          // Conta só itens que ainda existem na ficha. Ponto de medição
+          // removido (Barramento 1 X Barramento 2) fica gravado na execução
+          // antiga, mas não é mais item: sem o filtro, a ficha mostrava
+          // "8/7 medidos" — mais medidos do que pontos.
+          const idsDaFicha = new Set(ficha?.itens.map((i) => i.id) ?? []);
+          const preenchidos = exec.valores.filter(
+            (v) => v.valor !== "" && idsDaFicha.has(v.itemId),
+          ).length;
 
           return (
             <div

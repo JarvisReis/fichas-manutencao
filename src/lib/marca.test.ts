@@ -25,10 +25,20 @@ describe('marca única: Sechéron', () => {
     expect(normalizarMarca('SECHERON')).toBeUndefined()
   })
 
-  it('limite próprio continua valendo depois de normalizar', () => {
+  it('limite de Cabos X Barramentos é 15 µΩ para qualquer marca', () => {
+    // Decisão do Ricardo: limite único para todos os contatores. Antes eram
+    // 30 µΩ no geral e 15 µΩ só na Sechéron — duas respostas para a mesma
+    // medição. Se alguém reintroduzir limite por marca, este teste quebra.
     const ficha = FICHAS.find((f) => f.id === 'CT-FICHA')!
     const cabos = ficha.itens.find((i) => i.id === 'cabos-barr')!
     expect(limiteDoItem(cabos, normalizarMarca('schneider'))).toBe(15)
-    expect(limiteDoItem(cabos, 'merlin')).toBe(30)
+    expect(limiteDoItem(cabos, 'merlin')).toBe(15)
+    expect(limiteDoItem(cabos, undefined)).toBe(15)
+  })
+
+  it('a ficha tem 7 pontos de medição, sem Barramento 1 X Barramento 2', () => {
+    const ficha = FICHAS.find((f) => f.id === 'CT-FICHA')!
+    expect(ficha.itens).toHaveLength(7)
+    expect(ficha.itens.some((i) => i.id === 'barr1-barr2')).toBe(false)
   })
 })

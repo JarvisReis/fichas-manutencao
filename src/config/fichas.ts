@@ -91,7 +91,7 @@ export const FICHAS: DefinicaoFicha[] = [
     id: 'CT-FICHA',
     nome: 'Ficha de Acompanhamento do Contator',
     nomeCurto: 'Contator (marca)',
-    subtitulo: 'Ficha Sechéron · 8 pontos de medição',
+    subtitulo: 'Ficha Sechéron · 7 pontos de medição',
     prefixo: 'CT',
     exigeMarca: true,
     tiposManutencao: ['P1', 'P2'],
@@ -134,16 +134,6 @@ export const FICHAS: DefinicaoFicha[] = [
         aceitaInfinito: true,
       },
       {
-        id: 'barr1-barr2',
-        nome: 'Barramento 1 X Barramento 2',
-        instrumento: 'Medidor de Isolação',
-        unidade: 'MΩ',
-        direcao: 'min',
-        limite: 70,
-        aceitaInfinito: true,
-        apenasMarca: 'merlin',
-      },
-      {
         id: 'cub-nt-cubo',
         nome: 'Barr. do Cubículo X Núcleo do Contator',
         instrumento: 'Microohmímetro (res. de contato)',
@@ -165,8 +155,10 @@ export const FICHAS: DefinicaoFicha[] = [
         instrumento: 'Microohmímetro (res. de contato)',
         unidade: 'µΩ',
         direcao: 'max',
-        limite: 30,
-        limiteSchneider: 15,
+        // Limite único: 15 µΩ para todo contator. Antes eram 30 µΩ no geral e
+        // 15 µΩ só na Sechéron; como a marca passou a ser única, um limite por
+        // marca virou duas respostas possíveis para a mesma medição.
+        limite: 15,
       },
     ],
     camposFixos: [
