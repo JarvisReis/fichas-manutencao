@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { RG_VALIDO, rgValido } from './cadastros'
+import { RG_VALIDO, pessoaSelecionavel, rgPareceOrgao, rgValido } from './cadastros'
 
 /*
  * Regressão: o filtro de equipe exigia RG começando com dígito enquanto o
@@ -46,5 +46,45 @@ describe('rgValido', () => {
   it('a regex exportada concorda com o helper', () => {
     expect(RG_VALIDO.test('MG-12345')).toBe(true)
     expect(RG_VALIDO.test('ab')).toBe(false)
+  })
+})
+
+/*
+ * Regressão: o campo RG é texto livre, e o técnico às vezes digita o órgão
+ * emissor ("R SSP") em vez do número. O registro entrava na lista de equipe
+ * como se fosse funcionário, e a busca por "221043" trazia junto o "R221043".
+ */
+describe('rgPareceOrgao', () => {
+  it('reconhece abreviação de órgão emissor', () => {
+    expect(rgPareceOrgao('R SSP')).toBe(true)
+    expect(rgPareceOrgao('R SP')).toBe(true)
+    expect(rgPareceOrgao('  r sp  ')).toBe(true)
+  })
+
+  it('não confunde RG numérico com órgão', () => {
+    expect(rgPareceOrgao('221221')).toBe(false)
+    expect(rgPareceOrgao('221043')).toBe(false)
+    expect(rgPareceOrgao('R221043')).toBe(false)
+    expect(rgPareceOrgao('MG-12345')).toBe(false)
+  })
+})
+
+describe('pessoaSelecionavel', () => {
+  const base = { id: '1', nome: 'Luciano Severino', rg: '221043', nivel: 'usuario', ativo: true } as const
+
+  it('aceita funcionário ativo com nome e RG', () => {
+    expect(pessoaSelecionavel({ ...base, nivel: 'usuario' })).toBe(true)
+  })
+
+  it('recusa registro inativo', () => {
+    expect(pessoaSelecionavel({ ...base, nivel: 'usuario', ativo: false })).toBe(false)
+  })
+
+  it('recusa registro sem nome', () => {
+    expect(pessoaSelecionavel({ ...base, nome: '   ', nivel: 'usuario' })).toBe(false)
+  })
+
+  it('recusa RG que é órgão emissor', () => {
+    expect(pessoaSelecionavel({ ...base, rg: 'R SSP', nivel: 'usuario' })).toBe(false)
   })
 })

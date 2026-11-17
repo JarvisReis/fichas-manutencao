@@ -85,7 +85,9 @@ export function filtrarPessoas(lista: Pessoa[], busca: string): Pessoa[] {
     // Inativo sai da seleção da execução — mas continua aparecendo no editor
     // de cadastros, onde o administrador pode reativar. Desativar é "não
     // escalar mais", não "apagar".
-    .filter((p) => p.ativo !== false)
+    // RG que é órgão emissor ("R SSP") também sai: cadastro sem nome de
+    // gente não é pessoa, e aparecia na lista como se fosse.
+    .filter(pessoaSelecionavel)
     .filter((p) => {
       if (!termo) return true
       return normalizar(`${p.nome} ${p.rg} ${p.funcao ?? ''}`).includes(termo)
@@ -147,3 +149,26 @@ export const RG_VALIDO = /^(?=.*\d)[0-9A-Za-zÀ-ÿ][0-9A-Za-zÀ-ÿ.\-/ ]{1,19}$/
 
 export const rgValido = (rg: string | undefined | null): boolean =>
   RG_VALIDO.test((rg ?? '').trim())
+
+/**
+ * Um RG que na verdade é órgão emissor: "R SSP", "R SP", "R 123".
+ *
+ * O campo RG do cadastro aceita texto livre, então o técnico às vezes digita
+ * o órgão emissor em vez do número — e o registro entra na equipe como se
+ * fosse gente. "R" sozinho como primeiro caractere seguido de espaço não é
+ * início de RG nenhum: nenhum RG brasileiro começa assim, e o formato é
+ * exatamente o da sigla do órgão abreviado.
+ */
+const RG_COMO_ORGAO = /^R\s/i
+
+export const rgPareceOrgao = (rg: string | undefined | null): boolean =>
+  RG_COMO_ORGAO.test((rg ?? '').trim())
+
+/**
+ * Só quem realmente entra na equipe: tem nome e RG que não é órgão.
+ *
+ * Usado nas listas de seleção da execução. No cadastro a pessoa continua
+ * aparecendo — é lá que o administrador corrige o RG errado.
+ */
+export const pessoaSelecionavel = (p: Pessoa): boolean =>
+  p.ativo !== false && p.nome.trim().length > 0 && !rgPareceOrgao(p.rg)

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Check, Search, Users, X } from 'lucide-react'
 import type { Pessoa } from '../lib/cadastros'
-import { filtrarPessoas, normalizar } from '../lib/cadastros'
+import { filtrarPessoas, normalizar, pessoaSelecionavel } from '../lib/cadastros'
 
 interface Props {
   pessoas: Pessoa[]
@@ -24,9 +24,10 @@ export default function SeletorEquipe({ pessoas, selecionados, onAlternar, onRem
   const lista = useMemo(() => filtrarPessoas(pessoas, busca), [pessoas, busca])
   // Ativos é o universo que a seleção considera; ocultos alimenta o aviso de
   // que existe gente cadastrada fora da lista (inativa) — senão o técnico
-  // procura e não encontra, sem nenhuma explicação na tela.
-  const ativos = pessoas.filter((p) => p.ativo !== false)
-  const ocultos = pessoas.length - ativos.length
+  // procura e não encontra, sem nenhuma explicação na tela. Registro sem nome
+  // ou com órgão emissor no lugar do RG não conta como oculto: não é gente.
+  const ativos = pessoas.filter(pessoaSelecionavel)
+  const ocultos = pessoas.filter((p) => p.ativo === false).length
 
   const estaSelecionado = (pessoa: Pessoa) => selecionados.some((rg) => normalizar(rg) === normalizar(pessoa.rg))
 
