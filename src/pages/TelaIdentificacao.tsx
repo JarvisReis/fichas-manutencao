@@ -149,6 +149,22 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
     salvarCampos({ camposFixos: reconstruirRgs(camposFixos, proximos) })
   }
 
+  /**
+   * Remove um RG direto da equipe, sem depender de existir pessoa no cadastro.
+   *
+   * É o caminho de saída para o RG órfão: o técnico corrigiu o RG no cadastro
+   * (ou excluiu a pessoa) e o rascunho ficou com o valor antigo gravado. Antes
+   * esse chip aparecia como "—" e o botão de remover não fazia nada, porque
+   * removia "alternando" uma pessoa que não existia mais.
+   */
+  const removerRg = (rg: string) => {
+    const alvo = rg.trim()
+    const proximos = extrairRgs(camposFixos).filter((r) => r.trim() !== alvo)
+    setAvisoEquipe(null)
+    setCamposFixos(reconstruirRgs(camposFixos, proximos))
+    salvarCampos({ camposFixos: reconstruirRgs(camposFixos, proximos) })
+  }
+
   const selecionarEquipamento = (equipamento: Equipamento | null, texto: string) => {
     setEquipamentoNome(texto)
     // O núcleo instalado não vem do cadastro do equipamento: é lido da última
@@ -365,6 +381,7 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
             pessoas={pessoas}
             selecionados={equipe}
             onAlternar={selecionarPessoa}
+            onRemoverRg={removerRg}
           />
           {avisoEquipe && (
             <p className="mt-2 rounded-lg bg-amber-50 p-2 text-[11px] font-medium text-amber-900">

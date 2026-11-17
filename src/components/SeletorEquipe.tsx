@@ -7,10 +7,18 @@ interface Props {
   pessoas: Pessoa[]
   selecionados: string[]
   onAlternar: (pessoa: Pessoa) => void
+  /**
+   * Remove um RG direto da lista, sem passar pelo cadastro. Necessário porque
+   * um RG pode estar gravado na execução e não corresponder a ninguém: o
+   * técnico corrigiu o RG no cadastro, ou a pessoa foi excluída. Nesse caso o
+   * chip aparece como "—" e o botão de remover ficava morto, sem saída na
+   * tela.
+   */
+  onRemoverRg?: (rg: string) => void
 }
 
 /** Equipe da execução: marcação múltipla com busca, sem limite de quantidade. */
-export default function SeletorEquipe({ pessoas, selecionados, onAlternar }: Props) {
+export default function SeletorEquipe({ pessoas, selecionados, onAlternar, onRemoverRg }: Props) {
   const [busca, setBusca] = useState('')
 
   const lista = useMemo(() => filtrarPessoas(pessoas, busca), [pessoas, busca])
@@ -47,21 +55,32 @@ export default function SeletorEquipe({ pessoas, selecionados, onAlternar }: Pro
           <div className="flex flex-wrap gap-1.5">
             {selecionados.map((rg) => {
               const pessoa = pessoas.find((p) => normalizar(p.rg) === normalizar(rg))
+              // Sem pessoa no cadastro o RG é órfão: sobrou de um cadastro
+              // corrigido ou excluído. Não dá para removê-lo "alternando" a
+              // pessoa, porque ela não existe — daí o caminho próprio.
+              const orfao = !pessoa
+              const remover = () => {
+                if (pessoa) onAlternar(pessoa)
+                else onRemoverRg?.(rg)
+              }
               return (
                 <span
                   key={rg}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-blue-100 px-2 py-1 text-[11px] font-semibold text-blue-900"
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-semibold ${
+                    orfao ? 'bg-amber-100 text-amber-900' : 'bg-blue-100 text-blue-900'
+                  }`}
+                  title={orfao ? 'Este RG não corresponde a ninguém no cadastro' : undefined}
                 >
-                  <span className="max-w-[9rem] truncate">{pessoa?.nome ?? '—'}</span>
+                  <span className="max-w-[9rem] truncate">
+                    {pessoa?.nome ?? 'Fora do cadastro'}
+                  </span>
                   <span className="rounded bg-white/70 px-1 font-mono text-[10px] font-bold">
                     RG {rg}
                   </span>
                   <button
                     type="button"
-                    aria-label={`Remover ${pessoa?.nome ?? rg}`}
-                    onClick={() => {
-                      if (pessoa) onAlternar(pessoa)
-                    }}
+                    aria-label={`Remover ${pessoa?.nome ?? `RG ${rg}`}`}
+                    onClick={remover}
                   >
                     <X size={12} />
                   </button>
