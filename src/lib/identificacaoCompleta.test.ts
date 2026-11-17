@@ -38,6 +38,6 @@ describe('identificacaoCompleta', () => {
 
   it('só exige marca quando a ficha exige', () => {
     expect(identificacaoCompleta(base, { exigeMarca: true })).toBe(false)
-    expect(identificacaoCompleta({ ...base, marca: 'schneider' }, { exigeMarca: true })).toBe(true)
+    expect(identificacaoCompleta({ ...base, marca: 'secheron' }, { exigeMarca: true })).toBe(true)
   })
 })

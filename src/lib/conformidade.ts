@@ -12,7 +12,7 @@ const fmtNum = (n: number) => (Number.isInteger(n) ? String(n) : String(n).repla
 
 /** Limite aplicável ao item para a marca informada. Itens de marca única ignoram o parâmetro. */
 export function limiteDoItem(item: ItemFicha, marca?: Marca): number {
-  if (marca === 'schneider' && item.limiteSchneider !== undefined) return item.limiteSchneider
+  if (marca === 'secheron' && item.limiteSchneider !== undefined) return item.limiteSchneider
   return item.limite
 }
 

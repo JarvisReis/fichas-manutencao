@@ -1,23 +1,37 @@
 export type Unidade = 'MΩ' | 'µΩ' | 'A'
 export type Direcao = 'min' | 'max'
 /**
- * Marca do contator. Hoje existe uma só, a Sechéron (Schneider). O tipo
- * continua existindo porque o histórico já gravou `merlin` e a ficha tem
- * limite por marca — mas não há mais escolha na tela.
- *
- * A chave interna continua `schneider`: é o que está gravado nas execuções e
- * no servidor. Só o nome que o técnico vê é "Sechéron" — trocar a chave
- * quebraria todo registro já salvo.
+ * Marca do contator. Hoje existe uma só, a Sechéron. O tipo continua existindo
+ * porque registros antigos gravaram `merlin` — neles a marca é `merlin` até
+ * alguém reabrir e salvar, e aí a migração converte.
  */
-export type Marca = 'merlin' | 'schneider'
+export type Marca = 'merlin' | 'secheron'
 
 /** Marca única dos contatores. Não é escolha do técnico. */
-export const MARCA_CONTATOR: Marca = 'schneider'
+export const MARCA_CONTATOR: Marca = 'secheron'
+
+/**
+ * Chave antiga que ficou gravada em execuções e no servidor. Só serve para
+ * LER: nada é mais gravado como `schneider`.
+ */
+const CHAVE_ANTIGA = 'schneider'
+
+/**
+ * Converte a marca lida do banco/servidor para a chave atual.
+ * Sem isso, execução antiga com `schneider` passaria a ser tratada como
+ * "marca que não existe" e perderia o limite próprio.
+ */
+export function normalizarMarca(bruta?: string | null): Marca | undefined {
+  if (!bruta) return undefined
+  if (bruta === CHAVE_ANTIGA) return MARCA_CONTATOR
+  if (bruta === 'merlin' || bruta === MARCA_CONTATOR) return bruta
+  return undefined
+}
 
 /** Nome da marca como aparece na tela. Um lugar só: ficha, medição e etiqueta. */
 export const NOME_MARCA: Record<Marca, string> = {
   merlin: 'Merlin Gerin',
-  schneider: 'Sechéron',
+  secheron: 'Sechéron',
 }
 export type TipoManutencao = 'P1' | 'P2'
 

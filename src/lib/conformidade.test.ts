@@ -59,13 +59,13 @@ describe('parseValor', () => {
 
 describe('limite por marca', () => {
   it('usa limite Schneider quando informado', () => {
-    expect(limiteDoItem(cabos, 'schneider')).toBe(15)
+    expect(limiteDoItem(cabos, 'secheron')).toBe(15)
     expect(limiteDoItem(cabos, 'merlin')).toBe(30)
   })
   it('formata o limite com operador e unidade', () => {
     expect(limiteExibido(iso30)).toBe('mín. 30 MΩ')
     expect(limiteExibido(res80)).toBe('máx. 80 µΩ')
-    expect(limiteExibido(cabos, 'schneider')).toBe('máx. 15 µΩ')
+    expect(limiteExibido(cabos, 'secheron')).toBe('máx. 15 µΩ')
   })
 })
 
@@ -97,11 +97,11 @@ describe('avaliarItem — vazio e N/A', () => {
     expect(avaliarItem(iso30, '').resultado).toBe('vazio')
   })
   it('item exclusivo de Merlin Gerin é N/A em Schneider', () => {
-    expect(avaliarItem(soMG, '500', 'schneider').resultado).toBe('na')
+    expect(avaliarItem(soMG, '500', 'secheron').resultado).toBe('na')
     expect(avaliarItem(soMG, '500', 'merlin').resultado).toBe('conforme')
   })
   it('aplica limite de Schneider na comparação', () => {
-    expect(avaliarItem(cabos, '20', 'schneider').resultado).toBe('nao_conforme')
+    expect(avaliarItem(cabos, '20', 'secheron').resultado).toBe('nao_conforme')
     expect(avaliarItem(cabos, '20', 'merlin').resultado).toBe('conforme')
   })
 })

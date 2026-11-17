@@ -51,6 +51,16 @@ export default function TelaHistorico({
   // Depois do toque, o botão desabilita: sem isso, toque duplo dispara duas
   // exclusões e a segunda volta com erro, parecendo que nada foi apagado.
   const [excluindo, setExcluindo] = useState(false);
+  /**
+   * Limpeza em lote. Existe porque as fichas de teste de homologação estavam
+   * sendo apagadas uma a uma pelo histórico — trabalho braçal e sujeito a
+   * deixar resto para trás. Contagem vem antes da pergunta: o administrador vê
+   * o tamanho do estrago antes de confirmar.
+   */
+  const [limpandoTudo, setLimpandoTudo] = useState(false);
+  const [confirmandoLimpeza, setConfirmandoLimpeza] = useState<number | null>(
+    null,
+  );
 
   /**
    * A exclusão é de administrador: o aparelho apaga a cópia local e o serviço de
@@ -88,6 +98,34 @@ export default function TelaHistorico({
       });
     } finally {
       setExcluindo(false);
+    }
+  };
+
+  /**
+   * Apaga TODAS as execuções deste aparelho, com as fotos.
+   *
+   * Só local de propósito: apagar linha por linha no SharePoint exigiria uma
+   * requisição por ficha e, se a rede cair no meio, sobra um estado meio
+   * apagado que ninguém consegue explicar depois. Para limpar o servidor, o
+   * caminho é o de sempre: exclusão individual, que confirma com o servidor.
+   */
+  const limparTodas = async () => {
+    if (limpandoTudo) return;
+    setLimpandoTudo(true);
+    try {
+      const ids = new Set((execucoes ?? []).map((e) => e.id));
+      const fotos = await db.fotos.toArray();
+      for (const f of fotos) {
+        if (ids.has(f.execucaoId)) await db.fotos.delete(f.id);
+      }
+      for (const id of ids) await db.execucoes.delete(id);
+      setConfirmandoLimpeza(null);
+      setAviso({
+        erro: false,
+        texto: `${ids.size} execução(ões) apagada(s) deste aparelho. No SharePoint, se houver linha, é preciso excluir pelo botão individual.`,
+      });
+    } finally {
+      setLimpandoTudo(false);
     }
   };
 
@@ -132,6 +170,14 @@ export default function TelaHistorico({
               {execucoes?.length ?? 0} execução(ões) neste aparelho
             </p>
           </div>
+          {podeExcluir && (execucoes?.length ?? 0) > 0 && (
+            <button
+              onClick={() => setConfirmandoLimpeza(execucoes?.length ?? 0)}
+              className="rounded-xl border border-red-200 px-2.5 py-1.5 text-[11px] font-semibold text-red-700 active:bg-red-50"
+            >
+              Limpar
+            </button>
+          )}
         </div>
       </header>
 
@@ -330,6 +376,40 @@ export default function TelaHistorico({
           );
         })}
       </div>
+
+      {confirmandoLimpeza !== null && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+            <h2 className="text-base font-bold text-slate-900">
+              Apagar todas as execuções?
+            </h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Serão apagadas <strong>{confirmandoLimpeza} execução(ões)</strong>{" "}
+              deste aparelho, incluindo as fotos. Os cadastros de equipamentos e
+              pessoas não são tocados. Não há como desfazer.
+            </p>
+            <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+              Isto apaga só a cópia local. Fichas já publicadas continuam no
+              SharePoint.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => setConfirmandoLimpeza(null)}
+                className="flex-1 rounded-xl border-2 border-slate-300 py-3 text-sm font-semibold text-slate-700"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => void limparTodas()}
+                disabled={limpandoTudo}
+                className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-semibold text-white disabled:bg-slate-300 disabled:text-slate-500"
+              >
+                {limpandoTudo ? "Apagando…" : "Apagar tudo"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {confirmando && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MARCA_CONTATOR, type DefinicaoFicha, type Execucao } from './types'
-import { db, gerarCodigo, limparRascunhosVencidos, limparRgOrgaoGravado } from './lib/db'
+import { db, gerarCodigo, limparRascunhosVencidos, limparRgOrgaoGravado, migrarChaveMarca } from './lib/db'
 import { getFicha } from './config/fichas'
 import { lerEquipamentos, lerPessoas, type Equipamento } from './lib/cadastros'
 import { identificacaoCompleta, podeEditarExecucao } from './lib/permissoes'
@@ -344,6 +344,8 @@ export default function App() {
     restauracaoFeita.current = true
     void (async () => {
       // Só depois da limpeza: um rascunho vencido não deve reabrir.
+      // A marca vem antes de tudo: sem a chave atual, o limite lido é o errado.
+      await migrarChaveMarca().catch(() => {})
       await limparRgOrgaoGravado().catch(() => {})
       await limparRascunhosVencidos().catch(() => {})
       await aplicarRotaDaUrl()

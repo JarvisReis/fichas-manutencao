@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie'
-import type { Execucao, Foto } from '../types'
+import { MARCA_CONTATOR, type Execucao, type Foto } from '../types'
 import { rascunhoExpirado } from './permissoes'
 import { rgPareceOrgao } from './cadastros'
 
@@ -257,4 +257,27 @@ export async function limparRgOrgaoGravado(): Promise<number> {
     corrigidas += 1
   }
   return corrigidas
+}
+
+/**
+ * Converte a chave antiga de marca (`schneider`) para a atual (`secheron`).
+ *
+ * Roda na abertura do app. Sem isso, execução gravada antes da renomeação
+ * continuaria com uma chave que o código não reconhece mais — perderia de
+ * silêncio o limite próprio da marca (15 µΩ em vez de 30 µΩ em Cabos X
+ * Barramentos), e o erro seria invisível na tela.
+ *
+ * Mesmo cuidado de `limparRgOrgaoGravado`: `toArray` + `for`, nunca `each`
+ * com callback async.
+ */
+export async function migrarChaveMarca(): Promise<number> {
+  const todas = await db.execucoes.toArray()
+  let migradas = 0
+  for (const exec of todas) {
+    const bruta = exec.marca as string | undefined
+    if (bruta !== 'schneider') continue
+    await db.execucoes.put({ ...exec, marca: MARCA_CONTATOR })
+    migradas += 1
+  }
+  return migradas
 }
