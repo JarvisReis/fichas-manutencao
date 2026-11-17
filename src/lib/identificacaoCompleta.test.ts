@@ -4,7 +4,7 @@ import { identificacaoCompleta } from './permissoes'
 const base = {
   local: 'Sala 7',
   tipoManutencao: 'P1' as const,
-  camposFixos: { rg1: '221221', rg2: '221043' },
+  camposFixos: { rg1: 'R221221', rg2: 'R221043' },
 }
 
 describe('identificacaoCompleta', () => {
@@ -17,17 +17,17 @@ describe('identificacaoCompleta', () => {
   })
 
   it('barra com uma pessoa só', () => {
-    expect(identificacaoCompleta({ ...base, camposFixos: { rg1: '221221' } })).toBe(false)
+    expect(identificacaoCompleta({ ...base, camposFixos: { rg1: 'R221221' } })).toBe(false)
   })
 
   it('não conta o mesmo RG duas vezes', () => {
-    expect(identificacaoCompleta({ ...base, camposFixos: { rg1: '221221', rg2: '221-221' } })).toBe(
+    expect(identificacaoCompleta({ ...base, camposFixos: { rg1: 'R221221', rg2: 'R221-221' } })).toBe(
       false,
     )
   })
 
   it('não conta órgão emissor gravado no lugar do RG', () => {
-    expect(identificacaoCompleta({ ...base, camposFixos: { rg1: '221221', rg2: 'R SSP' } })).toBe(
+    expect(identificacaoCompleta({ ...base, camposFixos: { rg1: 'R221221', rg2: 'R SSP' } })).toBe(
       false,
     )
   })

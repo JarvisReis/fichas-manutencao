@@ -141,23 +141,25 @@ export async function aplicarCadastrosDoServidor(dados: {
  * depois descartado em silêncio na hora de montar a equipe — a pessoa
  * aparecia na lista, o toque não marcava, e nada explicava o motivo.
  *
- * Regra do Metrô: o RG é o número funcional, **só dígitos**, de 5 a 6
- * caracteres (`221221`, `22104`). Sem letra, hífen, ponto, barra ou espaço —
- * senão o campo vira texto livre e volta a aceitar "R SSP", que não é pessoa.
+ * Regra do Metrô: identificação interna, sempre com o prefixo **R** e mais
+ * 5 ou 6 dígitos — `R221221`, `R22104`. Não é documento oficial (RG civil):
+ * é o registro funcional da própria empresa, e por isso o formato é fixo.
+ *
+ * O prefixo é obrigatório. Sem ele o campo volta a ser texto livre, e foi
+ * exatamente assim que "R SSP" (órgão emissor) entrou no lugar de um número.
  */
-export const RG_VALIDO = /^\d{5,6}$/
+export const RG_VALIDO = /^R\d{5,6}$/i
 
 export const rgValido = (rg: string | undefined | null): boolean =>
   RG_VALIDO.test((rg ?? '').trim())
 
 /**
- * Um RG que na verdade é órgão emissor: "R SSP", "R SP", "R 123".
+ * Um RG que na verdade é órgão emissor: "R SSP", "R SP".
  *
- * O campo RG do cadastro aceita texto livre, então o técnico às vezes digita
- * o órgão emissor em vez do número — e o registro entra na equipe como se
- * fosse gente. "R" sozinho como primeiro caractere seguido de espaço não é
- * início de RG nenhum: nenhum RG brasileiro começa assim, e o formato é
- * exatamente o da sigla do órgão abreviado.
+ * A regra atual (`R` + dígitos) já recusa isso na entrada, mas registros
+ * antigos gravaram o órgão no lugar do número. A função fica para a limpeza
+ * do banco em `db.ts`, que precisa reconhecer o lixo já gravado — sem isso
+ * os órfãos voltam a poluir a lista de equipe.
  */
 const RG_COMO_ORGAO = /^R\s/i
 

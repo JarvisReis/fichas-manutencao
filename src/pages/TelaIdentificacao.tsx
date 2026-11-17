@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, ArrowRight, Info } from 'lucide-react'
-import type { DefinicaoFicha, Execucao, Marca, TipoManutencao } from '../types'
+import { MARCA_CONTATOR, type DefinicaoFicha, type Execucao, type Marca, type TipoManutencao } from '../types'
 import {
   gerarCodigo,
   lerCamposFixos,
@@ -40,7 +40,10 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
   const [dataFim, setDataFim] = useState(() =>
     paraInputLocal(execucao.dataFim ?? somarDias(execucao.dataHora, dias - 1)),
   )
-  const [marca, setMarca] = useState<Marca | undefined>(execucao.marca)
+  // Marca não é escolha: todo contator é Schneider. A execução nasce com o
+  // valor gravado, então as telas de medição e a conformidade leem daqui sem
+  // precisar de seletor. Execuções antigas com `merlin` mantêm o que têm.
+  const [marca] = useState<Marca | undefined>(execucao.marca ?? (ficha.exigeMarca ? MARCA_CONTATOR : undefined))
   // P1 é o padrão: se o técnico não escolher o tipo, a ficha é salva como P1.
   const [tipoManutencao, setTipoManutencao] = useState<TipoManutencao | undefined>(
     execucao.tipoManutencao ?? ficha.tiposManutencao[0],
@@ -136,7 +139,7 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
     // simplesmente não marcava — sem mensagem nenhuma.
     if (!rgValido(rgLimpo)) {
       setAvisoEquipe(
-        `O RG "${rgLimpo}" não é aceito. Precisa ter ao menos um número e no máximo 20 caracteres.`,
+        `O RG "${rgLimpo}" não é aceito. O formato é R seguido de 5 ou 6 números — ex.: R221221.`,
       )
       return
     }
@@ -286,35 +289,15 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
             </p>
           )}
         </section>
+        {/* Marca única: todos os contatores da empresa são Schneider. Não é
+            escolha do técnico, então virou etiqueta — um botão a menos para
+            errar, e o valor entra sozinho na execução. */}
         {ficha.exigeMarca && (
           <section className="rounded-2xl border-2 border-slate-200 bg-white p-4">
             <h3 className="mb-2 text-sm font-semibold text-slate-900">Marca do equipamento</h3>
-            <p className="mb-3 text-xs text-slate-500">
-              O limite de alguns itens muda conforme o fabricante.
+            <p className="rounded-xl bg-slate-100 px-3 py-2.5 text-sm font-semibold text-slate-800">
+              Schneider
             </p>
-            <div className="grid grid-cols-2 gap-2">
-              {(
-                [
-                  { valor: 'merlin' as Marca, rotulo: 'Merlin Gerin' },
-                  { valor: 'schneider' as Marca, rotulo: 'Schneider' },
-                ] as const
-              ).map((opcao) => (
-                <button
-                  key={opcao.valor}
-                  onClick={() => {
-                    setMarca(opcao.valor)
-                    salvarCampos({ marca: opcao.valor })
-                  }}
-                  className={`rounded-xl border-2 py-3 text-sm font-semibold transition ${
-                    marca === opcao.valor
-                      ? 'border-blue-700 bg-blue-700 text-white'
-                      : 'border-slate-300 bg-white text-slate-700'
-                  }`}
-                >
-                  {opcao.rotulo}
-                </button>
-              ))}
-            </div>
           </section>
         )}
 

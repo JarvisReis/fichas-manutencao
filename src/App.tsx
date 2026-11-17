@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { DefinicaoFicha, Execucao } from './types'
+import { MARCA_CONTATOR, type DefinicaoFicha, type Execucao } from './types'
 import { db, gerarCodigo, limparRascunhosVencidos, limparRgOrgaoGravado } from './lib/db'
 import { getFicha } from './config/fichas'
 import { lerEquipamentos, lerPessoas, type Equipamento } from './lib/cadastros'
@@ -172,6 +172,9 @@ export default function App() {
       cabecalho: {},
       camposFixos: { equipamento: equipamento.nome },
       local: equipamento.local ?? '',
+      // Marca não é escolha: todo contator é Schneider. Grava na criação para
+      // a conformidade já ler o limite certo sem passar pela identificação.
+      ...(ficha.exigeMarca ? { marca: MARCA_CONTATOR } : {}),
       dataHora: agora.toISOString(),
       valores: ficha.itens.map((item) => ({ itemId: item.id, valor: '' })),
       status: 'rascunho',

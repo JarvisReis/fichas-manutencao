@@ -1,6 +1,14 @@
 export type Unidade = 'MΩ' | 'µΩ' | 'A'
 export type Direcao = 'min' | 'max'
+/**
+ * Marca do contator. Hoje existe uma só: Schneider (grafada "Sechéron" na
+ * empresa). O tipo continua existindo porque o histórico já gravou `merlin`
+ * e a ficha tem limite por marca — mas não há mais escolha na tela.
+ */
 export type Marca = 'merlin' | 'schneider'
+
+/** Marca única dos contatores. Não é escolha do técnico. */
+export const MARCA_CONTATOR: Marca = 'schneider'
 export type TipoManutencao = 'P1' | 'P2'
 
 export type ResultadoItem = 'conforme' | 'nao_conforme' | 'na'
@@ -13,11 +21,11 @@ export interface ItemFicha {
   instrumento: string
   unidade: Unidade
   direcao: Direcao
-  /** limite para Merlin Gerin (ou único, quando não varia por marca) */
+  /** limite padrão do item */
   limite: number
-  /** limite quando o equipamento é Schneider, se diferente */
+  /** limite quando o equipamento é Schneider, se diferente do padrão */
   limiteSchneider?: number
-  /** true quando o item não se aplica a alguma marca (ex.: B1 X B2 só existe em MG) */
+  /** item que só se aplica a uma marca (hoje nenhum: todos os contatores são Schneider) */
   apenasMarca?: Marca
   /** permite digitar "∞" (itens de isolação) */
   aceitaInfinito?: boolean
