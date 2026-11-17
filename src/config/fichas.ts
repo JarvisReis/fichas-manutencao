@@ -91,7 +91,7 @@ export const FICHAS: DefinicaoFicha[] = [
     id: 'CT-FICHA',
     nome: 'Ficha de Acompanhamento do Contator',
     nomeCurto: 'Contator (marca)',
-    subtitulo: 'Ficha Schneider / Merlin Gerin · 8 pontos de medição',
+    subtitulo: 'Ficha Sechéron · 8 pontos de medição',
     prefixo: 'CT',
     exigeMarca: true,
     tiposManutencao: ['P1', 'P2'],

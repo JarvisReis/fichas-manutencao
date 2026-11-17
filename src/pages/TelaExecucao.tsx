@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ChevronDown, Camera, Check, Infinity as Inf, Plus, Save, Trash2, X } from 'lucide-react'
-import type { DefinicaoFicha, Execucao, Foto, Marca, ValorItem } from '../types'
+import { NOME_MARCA, type DefinicaoFicha, type Execucao, type Foto, type Marca, type ValorItem } from '../types'
 import { avaliarItem } from '../lib/conformidade'
 import { comprimirImagem, db } from '../lib/db'
 import { lerPessoas } from '../lib/cadastros'
@@ -232,7 +232,7 @@ export default function TelaExecucao({
             <p className="truncate text-sm font-semibold text-slate-900">{ficha.nomeCurto}</p>
             <p className="text-xs text-slate-500">
               {execucao.codigo} · {execucao.local || 'sem local'}
-              {marca ? ` · ${marca === 'merlin' ? 'Merlin Gerin' : 'Schneider'}` : ''}
+              {marca ? ` · ${NOME_MARCA[marca]}` : ''}
               {execucao.tipoManutencao ? ` · ${execucao.tipoManutencao}` : ''}
             </p>
           </div>
@@ -258,7 +258,7 @@ export default function TelaExecucao({
               ['Local', execucao.local || '—'],
               ['Ficha', ficha.nomeCurto],
               ['Tipo', execucao.tipoManutencao || '—'],
-              ...(marca ? [[`Marca`, marca === 'merlin' ? 'Merlin Gerin' : 'Schneider']] : []),
+              ...(marca ? [[`Marca`, NOME_MARCA[marca]]] : []),
               ['Início', formatarDataHora(execucao.dataHora)],
               ...(execucao.dataFim && execucao.dataFim !== execucao.dataHora
                 ? [['Encerramento', formatarDataHora(execucao.dataFim)]]

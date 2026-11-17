@@ -1,14 +1,24 @@
 export type Unidade = 'MΩ' | 'µΩ' | 'A'
 export type Direcao = 'min' | 'max'
 /**
- * Marca do contator. Hoje existe uma só: Schneider (grafada "Sechéron" na
- * empresa). O tipo continua existindo porque o histórico já gravou `merlin`
- * e a ficha tem limite por marca — mas não há mais escolha na tela.
+ * Marca do contator. Hoje existe uma só, a Sechéron (Schneider). O tipo
+ * continua existindo porque o histórico já gravou `merlin` e a ficha tem
+ * limite por marca — mas não há mais escolha na tela.
+ *
+ * A chave interna continua `schneider`: é o que está gravado nas execuções e
+ * no servidor. Só o nome que o técnico vê é "Sechéron" — trocar a chave
+ * quebraria todo registro já salvo.
  */
 export type Marca = 'merlin' | 'schneider'
 
 /** Marca única dos contatores. Não é escolha do técnico. */
 export const MARCA_CONTATOR: Marca = 'schneider'
+
+/** Nome da marca como aparece na tela. Um lugar só: ficha, medição e etiqueta. */
+export const NOME_MARCA: Record<Marca, string> = {
+  merlin: 'Merlin Gerin',
+  schneider: 'Sechéron',
+}
 export type TipoManutencao = 'P1' | 'P2'
 
 export type ResultadoItem = 'conforme' | 'nao_conforme' | 'na'

@@ -672,7 +672,7 @@ function FormularioEquipamento({
             <input
               value={marca}
               onChange={(e) => setMarca(e.target.value)}
-              placeholder="Schneider"
+              placeholder="Sechéron"
               className="w-full rounded-lg border-2 border-slate-300 px-3 py-2.5 text-base text-slate-900 outline-none focus:border-blue-600"
             />
           </label>

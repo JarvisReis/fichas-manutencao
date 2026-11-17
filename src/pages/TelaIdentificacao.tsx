@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, ArrowRight, Info } from 'lucide-react'
-import { MARCA_CONTATOR, type DefinicaoFicha, type Execucao, type Marca, type TipoManutencao } from '../types'
+import { MARCA_CONTATOR, NOME_MARCA, type DefinicaoFicha, type Execucao, type Marca, type TipoManutencao } from '../types'
 import {
   gerarCodigo,
   lerCamposFixos,
@@ -296,7 +296,7 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
           <section className="rounded-2xl border-2 border-slate-200 bg-white p-4">
             <h3 className="mb-2 text-sm font-semibold text-slate-900">Marca do equipamento</h3>
             <p className="rounded-xl bg-slate-100 px-3 py-2.5 text-sm font-semibold text-slate-800">
-              Schneider
+              {NOME_MARCA[MARCA_CONTATOR]}
             </p>
           </section>
         )}
