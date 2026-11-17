@@ -2,32 +2,34 @@ import { describe, expect, it } from 'vitest'
 import { RG_VALIDO, pessoaSelecionavel, rgPareceOrgao, rgValido } from './cadastros'
 
 /*
- * Regressão: o filtro de equipe exigia RG começando com dígito enquanto o
- * formulário de cadastro aceitava qualquer texto. Resultado — RG com prefixo
- * de estado era gravado, aparecia na lista de equipe, e o toque não marcava,
- * sem nenhuma mensagem. Estes casos existem para que as duas telas nunca
- * voltem a discordar.
+ * Regra do Metrô: RG é o número funcional, só dígitos, de 5 a 6 caracteres.
+ * Antes o campo aceitava texto livre e o filtro de equipe descartava em
+ * silêncio — o registro aparecia na lista, o toque não marcava e nada
+ * explicava. Agora cadastro e filtro usam a MESMA regra, e o campo nem
+ * deixa digitar o que ela recusa.
  */
 describe('rgValido', () => {
-  it('aceita os formatos que aparecem de fato', () => {
-    const aceitos = [
-      '12345',
-      '12345.6',
-      '09233.9',
-      '12.345.678-9',
-      '12345-6',
-      'MG-12345',
-      'MG 12.345',
-      'SP1234567',
-    ]
-    for (const rg of aceitos) expect(rgValido(rg), rg).toBe(true)
+  it('aceita de 5 a 6 dígitos', () => {
+    for (const rg of ['12345', '221221', '00001']) {
+      expect(rgValido(rg), rg).toBe(true)
+    }
   })
 
-  it('recusa RG sem número algum', () => {
-    expect(rgValido('')).toBe(false)
-    expect(rgValido('   ')).toBe(false)
-    expect(rgValido('ab')).toBe(false)
-    expect(rgValido('MG')).toBe(false)
+  it('recusa curto demais', () => {
+    for (const rg of ['', '   ', '1', '123', '1234']) {
+      expect(rgValido(rg), rg).toBe(false)
+    }
+  })
+
+  it('recusa longo demais', () => {
+    expect(rgValido('1234567')).toBe(false)
+    expect(rgValido('1'.repeat(21))).toBe(false)
+  })
+
+  it('recusa letra, ponto, hífen, barra e espaço', () => {
+    for (const rg of ['22122A', '09233.9', '12345-6', 'MG-12345', 'SP1234567', '12 345']) {
+      expect(rgValido(rg), rg).toBe(false)
+    }
   })
 
   it('recusa vazio e nulo', () => {
@@ -35,17 +37,10 @@ describe('rgValido', () => {
     expect(rgValido(undefined)).toBe(false)
   })
 
-  it('ignora espaço nas pontas', () => {
-    expect(rgValido('  12345  ')).toBe(true)
-  })
-
-  it('recusa excesso de comprimento', () => {
-    expect(rgValido('1'.repeat(21))).toBe(false)
-  })
-
   it('a regex exportada concorda com o helper', () => {
-    expect(RG_VALIDO.test('MG-12345')).toBe(true)
-    expect(RG_VALIDO.test('ab')).toBe(false)
+    expect(RG_VALIDO.test('221221')).toBe(true)
+    expect(RG_VALIDO.test('MG-12345')).toBe(false)
+    expect(RG_VALIDO.test('1234')).toBe(false)
   })
 })
 

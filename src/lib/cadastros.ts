@@ -141,11 +141,11 @@ export async function aplicarCadastrosDoServidor(dados: {
  * depois descartado em silêncio na hora de montar a equipe — a pessoa
  * aparecia na lista, o toque não marcava, e nada explicava o motivo.
  *
- * Regra: de 2 a 20 caracteres, com ao menos um dígito, sem caractere de
- * controle. Aceita letras, números, ponto, hífen, barra e espaço — os formatos
- * que aparecem de fato em RG brasileiro.
+ * Regra do Metrô: o RG é o número funcional, **só dígitos**, de 5 a 6
+ * caracteres (`221221`, `22104`). Sem letra, hífen, ponto, barra ou espaço —
+ * senão o campo vira texto livre e volta a aceitar "R SSP", que não é pessoa.
  */
-export const RG_VALIDO = /^(?=.*\d)[0-9A-Za-zÀ-ÿ][0-9A-Za-zÀ-ÿ.\-/ ]{1,19}$/
+export const RG_VALIDO = /^\d{5,6}$/
 
 export const rgValido = (rg: string | undefined | null): boolean =>
   RG_VALIDO.test((rg ?? '').trim())

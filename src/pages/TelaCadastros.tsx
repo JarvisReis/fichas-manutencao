@@ -370,15 +370,21 @@ function FormularioPessoa({
           <span className="mb-1 block text-[11px] font-medium text-slate-600">RG *</span>
           <input
             value={rg}
-            onChange={(e) => setRg(e.target.value)}
-            placeholder="Ex.: 09233.9"
+            // Filtra na digitação: só dígitos, no máximo 6. O campo nem chega
+            // a aceitar letra, então o aviso abaixo é para o tamanho, não para
+            // formato impossível de digitar.
+            onChange={(e) => setRg(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={6}
+            placeholder="Ex.: 221221"
             className={`w-full rounded-lg border-2 px-3 py-2.5 text-base text-slate-900 outline-none focus:border-blue-600 ${
               rgInvalido ? 'border-red-400 bg-red-50' : 'border-slate-300'
             }`}
           />
           {rgInvalido && (
             <span className="mt-1 block text-[11px] font-medium text-red-700">
-              RG precisa ter ao menos um número — ex.: 09233.9 ou MG-12345.
+              RG precisa ter de 5 a 6 números — ex.: 221221.
             </span>
           )}
         </label>
