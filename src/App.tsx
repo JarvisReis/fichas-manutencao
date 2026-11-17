@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { DefinicaoFicha, Execucao } from './types'
-import { db, gerarCodigo } from './lib/db'
+import { db, gerarCodigo, limparRascunhosVencidos, limparRgOrgaoGravado } from './lib/db'
 import { getFicha } from './config/fichas'
 import { lerEquipamentos, lerPessoas, type Equipamento } from './lib/cadastros'
 import { podeEditarExecucao } from './lib/permissoes'
@@ -258,6 +258,25 @@ export default function App() {
       fichaId: ficha?.id ?? execucao.fichaId,
     } as Equipamento
   }
+
+  /**
+   * Limpa rascunhos vencidos antes de restaurar qualquer tela.
+   *
+   * Vem primeiro de propósito: se a URL aponta para um rascunho de 6 dias
+   * atrás, ele já não existe quando a restauração procura — e a queda para a
+   * home já é o comportamento esperado para execução que sumiu.
+   */
+  const limpezaFeita = useRef(false)
+  useEffect(() => {
+    if (limpezaFeita.current) return
+    limpezaFeita.current = true
+    void (async () => {
+      // Sujeira de RG gravada por versão antiga: tira do banco antes de
+      // qualquer tela ler a ficha, senão o chip "Fora do cadastro" volta.
+      await limparRgOrgaoGravado().catch(() => {})
+      await limparRascunhosVencidos().catch(() => {})
+    })()
+  }, [])
 
   /**
    * Restaura a tela que estava aberta quando a página foi recarregada.

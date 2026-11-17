@@ -53,3 +53,37 @@ export function tempoRestanteJanela(execucao: ExecucaoMinima, agora: number = Da
   const minutos = Math.floor((resta % 3_600_000) / 60_000)
   return horas > 0 ? `${horas} h ${minutos} min` : `${minutos} min`
 }
+
+/**
+ * Rascunho esquecido some sozinho depois de 5 dias.
+ *
+ * Rascunho é trabalho pela metade: sem essa limpeza, todo equipamento que
+ * alguém abriu e abandonou fica para sempre na seção "Continuar" da home, e a
+ * lista deixa de ser "o que estou fazendo" para virar depósito. Cinco dias
+ * cobre folga de fim de semana e feriado sem apagar trabalho de verdade — quem
+ * parou no meio da ficha volta na segunda e ela ainda está lá.
+ *
+ * Só rascunho expira. Concluída e pendente são registro do serviço, não
+ * trabalho em andamento: essas nunca somem sozinhas.
+ */
+export const VALIDADE_RASCUNHO_MS = 5 * 24 * 60 * 60 * 1000
+
+export function rascunhoExpirado(
+  execucao: ExecucaoMinima,
+  agora: number = Date.now(),
+): boolean {
+  if (execucao.status !== 'rascunho') return false
+  const salvoEm = Date.parse(execucao.atualizadaEm)
+  if (Number.isNaN(salvoEm)) return false
+  return agora - salvoEm > VALIDADE_RASCUNHO_MS
+}
+
+/** Quanto falta para o rascunho expirar, em dias ("2 dias", "1 dia"). */
+export function validadeDoRascunho(execucao: ExecucaoMinima, agora: number = Date.now()): string {
+  const salvoEm = Date.parse(execucao.atualizadaEm)
+  if (Number.isNaN(salvoEm)) return ''
+  const resta = VALIDADE_RASCUNHO_MS - (agora - salvoEm)
+  if (resta <= 0) return ''
+  const dias = Math.ceil(resta / 86_400_000)
+  return dias === 1 ? '1 dia' : `${dias} dias`
+}

@@ -13,6 +13,7 @@ import {
   lerEquipamentos,
   lerPessoas,
   RG_VALIDO,
+  rgPareceOrgao,
   rgValido,
   type Equipamento,
   type Pessoa,
@@ -521,6 +522,10 @@ function extrairRgs(camposFixos: Record<string, string>): string[] {
   for (let i = 1; i <= 6; i++) {
     const bruto = (camposFixos[`rg${i}`] ?? '').trim()
     if (!RG_VALIDO.test(bruto)) continue
+    // Órgão emissor gravado no lugar do RG ("R SSP"): não é gente, e deixar
+    // passar aqui faz o chip "Fora do cadastro" renascer a cada releitura da
+    // ficha, mesmo depois de removido da tela.
+    if (rgPareceOrgao(bruto)) continue
     const chave = bruto.replace(/[^0-9a-z]/gi, '').toLowerCase()
     if (vistos.has(chave)) continue
     vistos.add(chave)

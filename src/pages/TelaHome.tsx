@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { AlertTriangle, Check, ChevronRight, Clock, CloudOff, LogIn, LogOut, NotebookPen, Database, HardDriveDownload, Menu, Moon, Search, ShieldCheck, Sun, User as UserIcon, Users, Wifi, X } from 'lucide-react'
+import { AlertTriangle, Check, ChevronRight, Clock, CloudOff, LogIn, LogOut, NotebookPen, Database, HardDriveDownload, Menu, Moon, Search, ShieldCheck, Sun, Trash2, User as UserIcon, Users, Wifi, X } from 'lucide-react'
 import { db } from '../lib/db'
+import { validadeDoRascunho } from '../lib/permissoes'
 import { GRUPOS, grupoDaFicha } from '../config/fichas'
 import { lerEquipamentos, lerPessoas, normalizar, type Equipamento, type Pessoa } from '../lib/cadastros'
 import type { Sessao } from '../lib/sessao'
@@ -95,6 +96,26 @@ export default function TelaHome({
   }, [todas])
 
   const [menuAberto, setMenuAberto] = useState(false)
+  /**
+   * Rascunho que o administrador mandou apagar. A exclusão é só local: rascunho
+   * não foi publicado, então não há linha no SharePoint a apagar.
+   */
+  const [rascunhoApagando, setRascunhoApagando] = useState<{ id: string; nome: string } | null>(null)
+
+  /**
+   * Apaga um rascunho pelo cartão da home.
+   *
+   * O histórico já tinha exclusão, mas o rascunho esquecido aparece aqui, na
+   * cara do administrador — obrigá-lo a ir ao histórico para limpar o que está
+   * vendo é o tipo de rodeio que faz ninguém usar.
+   */
+  const apagarRascunho = async (id: string) => {
+    const fotos = await db.fotos.where('execucaoId').equals(id).toArray()
+    for (const f of fotos) await db.fotos.delete(f.id)
+    await db.execucoes.delete(id)
+    setRascunhoApagando(null)
+  }
+
   /**
    * A home mostra uma caixa por vez. Rascunho é trabalho em andamento; Mais
    * recente e Prioridade são as duas leituras do histórico de manutenções.
@@ -561,40 +582,64 @@ export default function TelaHome({
                 // data curta no cartão: a hora não cabe ao lado das etiquetas e
                 // empurrava o "NÃO ENVIADO" para uma linha extra
                 const quando = new Date(exec.atualizadaEm).toLocaleDateString('pt-BR')
+                const validade = validadeDoRascunho(exec)
                 return (
-                  <button
+                  <div
                     key={exec.id}
-                    onClick={() => onAbrirExecucao(exec.id)}
-                    className="flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 text-left"
+                    className="flex w-full items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3.5"
                   >
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
-                      <NotebookPen size={18} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-slate-900">
-                        {nome || exec.codigo}
+                    <button
+                      onClick={() => onAbrirExecucao(exec.id)}
+                      className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                        <NotebookPen size={18} />
                       </span>
-                      <span className="block truncate text-xs text-slate-500">
-                        {equip
-                          ? equip.local?.trim() || 'sem detalhes'
-                          : exec.local || 'sem detalhes'}
-                      </span>
-                      <span className="mt-1.5 flex flex-wrap items-center gap-1">
-                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-800">
-                          RASCUNHO
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-slate-900">
+                          {nome || exec.codigo}
                         </span>
-                        <span className="flex items-center py-0.5 text-[11px] text-slate-600">
-                          {quando}
+                        <span className="block truncate text-xs text-slate-500">
+                          {equip
+                            ? equip.local?.trim() || 'sem detalhes'
+                            : exec.local || 'sem detalhes'}
                         </span>
-                        {total > 1 && (
-                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-600">
-                            {total} EM ABERTO
+                        <span className="mt-1.5 flex flex-wrap items-center gap-1">
+                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-800">
+                            RASCUNHO
                           </span>
-                        )}
+                          <span className="flex items-center py-0.5 text-[11px] text-slate-600">
+                            {quando}
+                          </span>
+                          {total > 1 && (
+                            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-600">
+                              {total} EM ABERTO
+                            </span>
+                          )}
+                          {/* O prazo na cara: sem isso o rascunho some em
+                              silêncio no sexto dia e o técnico não sabe por
+                              quê. */}
+                          {validade && (
+                            <span className="py-0.5 text-[10px] text-amber-700">
+                              · some em {validade}
+                            </span>
+                          )}
+                        </span>
                       </span>
-                    </span>
+                    </button>
+                    {ehAdministrador && (
+                      <button
+                        onClick={() =>
+                          setRascunhoApagando({ id: exec.id, nome: nome || exec.codigo })
+                        }
+                        className="shrink-0 rounded-lg p-2 text-red-600 active:bg-red-50"
+                        aria-label="Excluir rascunho"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
                     <ChevronRight size={18} className="shrink-0 text-slate-400" />
-                  </button>
+                  </div>
                 )
               })}
             </div>
@@ -612,6 +657,32 @@ export default function TelaHome({
             </div>
           )}
         </section>
+
+        {rascunhoApagando && (
+          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
+            <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
+              <h2 className="text-base font-bold text-slate-900">Excluir rascunho?</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                O rascunho de <strong>{rascunhoApagando.nome}</strong> será apagado deste aparelho,
+                incluindo as fotos. O que já foi medido se perde.
+              </p>
+              <div className="mt-4 flex gap-2">
+                <button
+                  onClick={() => setRascunhoApagando(null)}
+                  className="flex-1 rounded-xl border-2 border-slate-300 py-3 text-sm font-semibold text-slate-700"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => void apagarRascunho(rascunhoApagando.id)}
+                  className="flex-1 rounded-xl bg-red-600 py-3 text-sm font-semibold text-white"
+                >
+                  Excluir
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

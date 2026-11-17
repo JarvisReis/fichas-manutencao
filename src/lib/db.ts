@@ -1,5 +1,7 @@
 import Dexie, { type Table } from 'dexie'
 import type { Execucao, Foto } from '../types'
+import { rascunhoExpirado } from './permissoes'
+import { rgPareceOrgao } from './cadastros'
 
 /**
  * Banco local do app. Tudo é gravado aqui primeiro — a sincronização com o
@@ -193,4 +195,66 @@ export async function comprimirImagem(arquivo: File, maxLargura = 1600): Promise
   )
   if (!blob) throw new Error('Falha ao comprimir a imagem')
   return blob
+}
+
+/* ------------------------- limpeza de rascunhos ---------------------------- */
+
+/**
+ * Apaga os rascunhos vencidos, junto com as fotos deles.
+ *
+ * Roda na abertura do app, antes de qualquer tela: assim a seção "Continuar"
+ * da home nunca mostra trabalho que já venceu. Devolve quantos foram apagados
+ * para a home poder avisar o técnico — apagar em silêncio um trabalho que a
+ * pessoa esqueceu é o tipo de coisa que faz ela desconfiar do app.
+ *
+ * Falha de leitura de um registro não pode travar a limpeza dos outros: cada
+ * exclusão é independente.
+ */
+export async function limparRascunhosVencidos(agora: number = Date.now()) {
+  const vencidos: string[] = []
+  await db.execucoes.each((exec) => {
+    if (rascunhoExpirado(exec, agora)) vencidos.push(exec.id)
+  })
+
+  for (const id of vencidos) {
+    const fotos = await db.fotos.where('execucaoId').equals(id).toArray()
+    for (const f of fotos) await db.fotos.delete(f.id)
+    await db.execucoes.delete(id)
+  }
+
+  return vencidos.length
+}
+
+/**
+ * Tira da ficha os RGs que na verdade são órgão emissor ("R SSP").
+ *
+ * Filtro na leitura não basta: o valor continua gravado no registro, e volta a
+ * aparecer como chip "Fora do cadastro" em qualquer tela que leia direto do
+ * banco. Aqui o campo é apagado de vez, uma vez só, na abertura do app.
+ *
+ * Não mexe em RG válido nem em ficha concluída — só limpa a sujeira que a
+ * validação antiga deixou passar.
+ */
+export async function limparRgOrgaoGravado(): Promise<number> {
+  // Lê tudo e filtra em memória: `Collection.each` com callback async não
+  // espera a promise, então o `put` de dentro escapava da transação e a
+  // limpeza não gravava nada. Arrays de verdade são mais previsíveis aqui —
+  // é uma leitura só, na abertura, e o volume é pequeno.
+  const todas = await db.execucoes.toArray()
+  let corrigidas = 0
+  for (const exec of todas) {
+    const campos: Record<string, string> = { ...(exec.camposFixos ?? {}) }
+    let mudou = false
+    for (let i = 1; i <= 6; i++) {
+      const chave = `rg${i}`
+      if (rgPareceOrgao(campos[chave] ?? '')) {
+        delete campos[chave]
+        mudou = true
+      }
+    }
+    if (!mudou) continue
+    await db.execucoes.put({ ...exec, camposFixos: campos })
+    corrigidas += 1
+  }
+  return corrigidas
 }
