@@ -7,6 +7,7 @@ import {
   lerEquipamentos,
   lerPessoas,
   novoId,
+  rgEmUso,
   rgValido,
   type Equipamento,
   type NivelAcesso,
@@ -223,6 +224,7 @@ function EditorPessoas({
       {editando && (
         <FormularioPessoa
           pessoa={editando}
+          pessoas={pessoas}
           onSalvar={salvar}
           onCancelar={() => setEditando(null)}
         />
@@ -327,10 +329,12 @@ function EditorPessoas({
 
 function FormularioPessoa({
   pessoa,
+  pessoas,
   onSalvar,
   onCancelar,
 }: {
   pessoa: Pessoa
+  pessoas: Pessoa[]
   onSalvar: (pessoa: Pessoa) => void
   onCancelar: () => void
 }) {
@@ -342,7 +346,13 @@ function FormularioPessoa({
   const [nivel, setNivel] = useState<NivelAcesso>(pessoa.nivel ?? 'usuario')
   const [ativo, setAtivo] = useState(pessoa.ativo)
 
-  const valido = nome.trim().length > 0 && rgValido(rg)
+  /**
+   * RG é único por funcionário: é o número que identifica a pessoa na empresa.
+   * Dois cadastros com o mesmo RG divide o histórico de duas pessoas em uma,
+   * e depois ninguém sabe de quem é a manutenção.
+   */
+  const rgDuplicado = rgEmUso(rg, pessoas, pessoa.id)
+  const valido = nome.trim().length > 0 && rgValido(rg) && !rgDuplicado
   // Só cobra o formato quando o campo já tem conteúdo — senão a tela nasce
   // em vermelho num formulário em branco.
   const rgInvalido = digitosRg.trim().length > 0 && !rgValido(rg)
@@ -391,12 +401,18 @@ function FormularioPessoa({
               pattern="[0-9]*"
               maxLength={6}
               placeholder="221221"
-              className={`w-full px-3 py-2.5 text-base text-slate-900 outline-none ${rgInvalido ? 'bg-red-50' : ''}`}
+              className={`w-full px-3 py-2.5 text-base text-slate-900 outline-none ${rgInvalido || rgDuplicado ? 'bg-red-50' : ''}`}
             />
           </div>
           {rgInvalido && (
             <span className="mt-1 block text-[11px] font-medium text-red-700">
               RG precisa ter de 5 a 6 números depois do R — ex.: R221221.
+            </span>
+          )}
+          {!rgInvalido && rgDuplicado && (
+            <span className="mt-1 block text-[11px] font-medium text-red-700">
+              Este RG já é de <strong>{rgDuplicado.nome}</strong>. Cada funcionário
+              tem um RG próprio.
             </span>
           )}
         </label>

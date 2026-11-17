@@ -199,3 +199,37 @@ export function extrairRgs(camposFixos: Record<string, string>): string[] {
   }
   return lista
 }
+
+/**
+ * Normaliza RG para comparação: maiúsculo, sem espaço e sem zero à esquerda.
+ *
+ * O zero à esquerda importa porque `R0221221` e `R221221` são a mesma pessoa
+ * digitando com pressa — se a comparação fosse literal, o mesmo funcionário
+ * entraria duas vezes e a trava não serviria para nada.
+ */
+const normalizarRg = (rg: string): string =>
+  rg.trim().toUpperCase().replace(/^R0+/, 'R')
+
+/**
+ * Outra pessoa do cadastro que já usa este RG.
+ *
+ * Devolve a pessoa em conflito (ou `null`). O `idAtual` sai da comparação
+ * para a edição não acusar a própria pessoa como duplicada.
+ *
+ * Inativo continua contando: desativar alguém não devolve o RG dele para a
+ * empresa — o número funcional segue sendo daquele funcionário, e reaproveitar
+ * misturaria o histórico das duas pessoas.
+ */
+export function rgEmUso(
+  rg: string,
+  pessoas: Pessoa[],
+  idAtual?: string,
+): Pessoa | null {
+  if (!rgValido(rg)) return null
+  const alvo = normalizarRg(rg)
+  return (
+    pessoas.find(
+      (p) => p.id !== idAtual && rgValido(p.rg) && normalizarRg(p.rg) === alvo,
+    ) ?? null
+  )
+}
