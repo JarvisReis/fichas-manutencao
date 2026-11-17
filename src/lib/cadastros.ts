@@ -82,7 +82,10 @@ export function filtrarEquipamentos(lista: Equipamento[], busca: string, fichaId
 export function filtrarPessoas(lista: Pessoa[], busca: string): Pessoa[] {
   const termo = normalizar(busca)
   return lista
-    .filter((p) => p.ativo)
+    // Inativo sai da seleção da execução — mas continua aparecendo no editor
+    // de cadastros, onde o administrador pode reativar. Desativar é "não
+    // escalar mais", não "apagar".
+    .filter((p) => p.ativo !== false)
     .filter((p) => {
       if (!termo) return true
       return normalizar(`${p.nome} ${p.rg} ${p.funcao ?? ''}`).includes(termo)

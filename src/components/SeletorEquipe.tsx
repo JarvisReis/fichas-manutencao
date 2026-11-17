@@ -14,10 +14,11 @@ export default function SeletorEquipe({ pessoas, selecionados, onAlternar }: Pro
   const [busca, setBusca] = useState('')
 
   const lista = useMemo(() => filtrarPessoas(pessoas, busca), [pessoas, busca])
-  const marcados = useMemo(
-    () => normalizar(selecionados.join(' ')),
-    [selecionados],
-  )
+  // Ativos é o universo que a seleção considera; ocultos alimenta o aviso de
+  // que existe gente cadastrada fora da lista (inativa) — senão o técnico
+  // procura e não encontra, sem nenhuma explicação na tela.
+  const ativos = pessoas.filter((p) => p.ativo !== false)
+  const ocultos = pessoas.length - ativos.length
 
   const estaSelecionado = (pessoa: Pessoa) => selecionados.some((rg) => normalizar(rg) === normalizar(pessoa.rg))
 
@@ -76,7 +77,9 @@ export default function SeletorEquipe({ pessoas, selecionados, onAlternar }: Pro
           <Users size={16} className="shrink-0" />
           {pessoas.length === 0
             ? 'Nenhuma pessoa cadastrada ainda. Cadastre em "Equipe e equipamentos".'
-            : `Ninguém encontrado para "${busca}".`}
+            : ativos.length === 0
+              ? 'Nenhum funcionário ativo. Reative alguém em "Equipe e equipamentos".'
+              : `Ninguém encontrado para "${busca}".`}
         </p>
       ) : (
         <div className="max-h-72 space-y-1 overflow-y-auto">
@@ -113,7 +116,18 @@ export default function SeletorEquipe({ pessoas, selecionados, onAlternar }: Pro
         </div>
       )}
 
-      {marcados && <span className="hidden">{marcados}</span>}
+      {/* O cadastro novo fica no aparelho e sobe para o servidor na publicação.
+          Se o celular do técnico ainda não puxou a versão publicada, a pessoa
+          existe mas não aparece — e antes isso virava "não deixa selecionar"
+          sem explicação nenhuma. */}
+      {ocultos > 0 && (
+        <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-900">
+          {ocultos === 1
+            ? '1 funcionário cadastrado está inativo e não aparece aqui.'
+            : `${ocultos} funcionários cadastrados estão inativos e não aparecem aqui.`}{' '}
+          Reative em "Equipe e equipamentos".
+        </p>
+      )}
     </div>
   )
 }
