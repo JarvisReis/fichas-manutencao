@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { DefinicaoFicha, Execucao } from './types'
 import { db, gerarCodigo } from './lib/db'
 import { getFicha } from './config/fichas'
@@ -23,17 +23,46 @@ type Rota =
   | { nome: 'cadastros' }
   | { nome: 'ficha'; ficha: DefinicaoFicha; execucao: Execucao; equipamento: Equipamento | null }
   | { nome: 'salvo'; execucao: Execucao; equipamento: Equipamento | null }
+  // Rota lida da URL que ainda precisa do banco para abrir (carrega o id).
+  | { nome: 'home'; pendente?: { nome: string; id: string } }
 
 /**
- * Grava a tela na URL (#/historico), para recarregar ou reabrir o app na mesma
- * tela. Só telas que não dependem de dados carregados entram na URL — ficha
- * aberta por id exigiria reabrir a execução, e isso fica para depois.
+ * Grava a tela na URL, para recarregar ou reabrir o app na mesma tela.
+ *
+ * Duas camadas:
+ *  - telas que não dependem de dados (`#/historico`, `#/backup`, ...)
+ *  - telas que abrem uma execução, que carregam o id: `#/execucao/<id>`,
+ *    `#/ficha/<id>`, `#/identificacao/<id>`
+ *
+ * Sem o id na URL, recarregar no meio de uma ficha jogava o técnico de volta
+ * para a home e ele tinha que achar o equipamento outra vez — o pior momento
+ * possível, porque a ficha estava pela metade.
  */
 const ROTAS_NA_URL = new Set(['historico', 'backup', 'cadastros'])
+const ROTAS_COM_ID = new Set(['identificacao', 'execucao', 'ficha'])
+
+/** Hash da rota, ou '' para a home. */
+function hashDaRota(rota: Rota): string {
+  if (ROTAS_NA_URL.has(rota.nome)) return `#/${rota.nome}`
+  if (ROTAS_COM_ID.has(rota.nome) && 'execucao' in rota) {
+    return `#/${rota.nome}/${encodeURIComponent(rota.execucao.id)}`
+  }
+  return ''
+}
 
 function rotaDaUrl(): Rota {
-  const alvo = window.location.hash.replace(/^#\/?/, '').split('?')[0]
-  return ROTAS_NA_URL.has(alvo) ? ({ nome: alvo } as Rota) : { nome: 'home' }
+  // `#/execucao/<id>` — o id pode conter caractere escapado, então separa no
+  // primeiro '/' depois do nome e decodifica o resto como id inteiro.
+  const alvo = window.location.hash.replace(/^#\/?/, '')
+  const barra = alvo.indexOf('/')
+  const nome = barra === -1 ? alvo : alvo.slice(0, barra)
+  const id = barra === -1 ? '' : alvo.slice(barra + 1)
+  if (ROTAS_NA_URL.has(nome)) return { nome } as Rota
+  // Rota com id é resolvida depois, quando o banco estiver disponível.
+  if (ROTAS_COM_ID.has(nome) && id) {
+    return { nome: 'home', pendente: { nome, id: decodeURIComponent(id) } } as Rota
+  }
+  return { nome: 'home' }
 }
 
 export default function App() {
@@ -43,7 +72,7 @@ export default function App() {
   const setRota: typeof setRotaState = (valor) => {
     setRotaState((atual) => {
       const proxima = typeof valor === 'function' ? valor(atual) : valor
-      const hash = ROTAS_NA_URL.has(proxima.nome) ? `#/${proxima.nome}` : ''
+      const hash = hashDaRota(proxima)
       if (window.location.hash !== hash) {
         const url = `${window.location.pathname}${window.location.search}${hash}`
         window.history.replaceState(null, '', url)
@@ -229,6 +258,57 @@ export default function App() {
       fichaId: ficha?.id ?? execucao.fichaId,
     } as Equipamento
   }
+
+  /**
+   * Restaura a tela que estava aberta quando a página foi recarregada.
+   *
+   * Roda uma vez, depois que o banco responde: a URL só guarda o id, e é
+   * preciso reler a execução e a ficha para remontar a rota. Se a execução
+   * sumiu (apagada em outro aparelho) ou a sessão não permite editar, cai na
+   * home sem barulho — restaurar não pode virar um erro na cara do técnico.
+   */
+  const restauracaoFeita = useRef(false)
+  useEffect(() => {
+    if (restauracaoFeita.current) return
+    const pendente = (rota as { pendente?: { nome: string; id: string } }).pendente
+    if (!pendente) {
+      restauracaoFeita.current = true
+      return
+    }
+    restauracaoFeita.current = true
+    void (async () => {
+      const execucao = await db.execucoes.get(pendente.id)
+      if (!execucao) {
+        setRotaState({ nome: 'home' })
+        return
+      }
+      const ficha = getFicha(execucao.fichaId)
+      if (!ficha) {
+        setRotaState({ nome: 'home' })
+        return
+      }
+      if (pendente.nome === 'identificacao') {
+        if (!podeEditarExecucao(execucao, sessao, execucao.criadaPor).pode) {
+          setRotaState({ nome: 'home' })
+          return
+        }
+        setRotaState({ nome: 'identificacao', ficha, execucao })
+        return
+      }
+      if (pendente.nome === 'execucao') {
+        if (!podeEditarExecucao(execucao, sessao, execucao.criadaPor).pode) {
+          setRotaState({ nome: 'home' })
+          return
+        }
+        setRotaState({ nome: 'execucao', ficha, execucao })
+        return
+      }
+      // 'ficha': registro concluído, aberto em leitura.
+      const equipamento = await equipamentoDaExecucao(execucao)
+      setRotaState({ nome: 'ficha', ficha, execucao, equipamento })
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- uma vez, na montagem
+  }, [])
 
   const salvarExecucao = async (id: string, status: Execucao['status']) => {
     const execucao = await db.execucoes.get(id)
