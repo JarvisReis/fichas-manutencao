@@ -9,11 +9,11 @@ import {
   salvarCamposFixos,
 } from '../lib/db'
 import { lerNucleoDoServidor } from '../lib/sync'
+import { identificacaoCompleta } from '../lib/permissoes'
 import {
   lerEquipamentos,
   lerPessoas,
-  RG_VALIDO,
-  rgPareceOrgao,
+  extrairRgs,
   rgValido,
   type Equipamento,
   type Pessoa,
@@ -185,10 +185,12 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
   // e o registro precisa identificar quem mediu e quem acompanhou.
   const equipe = extrairRgs(camposFixos)
   const equipeCompleta = equipe.length >= 2
-  // Sem escolha explícita vale P1 (primeiro tipo da ficha), então o tipo nunca
-  // barra o avanço — o contrato é: não escolheu, salva como P1.
-  const podeContinuar =
-    local.trim().length > 0 && (!ficha.exigeMarca || !!marca) && !!tipoManutencao && equipeCompleta
+  // Uma regra só, compartilhada com a home e a restauração de rota: se cada
+  // tela tivesse a sua, o rascunho barrado aqui abriria em medições ali.
+  const podeContinuar = identificacaoCompleta(
+    { local, marca, tipoManutencao, camposFixos },
+    { exigeMarca: ficha.exigeMarca },
+  )
 
   const continuar = () => {
     if (!podeContinuar) return
@@ -516,24 +518,6 @@ export default function TelaIdentificacao({ ficha, execucao, onVoltar, onAtualiz
  * nunca marcava e a tela não dizia por quê. Formato de RG é assunto do
  * cadastro (que avisa), não do filtro (que descarta em silêncio).
  */
-function extrairRgs(camposFixos: Record<string, string>): string[] {
-  const vistos = new Set<string>()
-  const lista: string[] = []
-  for (let i = 1; i <= 6; i++) {
-    const bruto = (camposFixos[`rg${i}`] ?? '').trim()
-    if (!RG_VALIDO.test(bruto)) continue
-    // Órgão emissor gravado no lugar do RG ("R SSP"): não é gente, e deixar
-    // passar aqui faz o chip "Fora do cadastro" renascer a cada releitura da
-    // ficha, mesmo depois de removido da tela.
-    if (rgPareceOrgao(bruto)) continue
-    const chave = bruto.replace(/[^0-9a-z]/gi, '').toLowerCase()
-    if (vistos.has(chave)) continue
-    vistos.add(chave)
-    lista.push(bruto)
-  }
-  return lista
-}
-
 /**
  * Regrava os campos rg1..rgN a partir da lista limpa, apagando as posições que
  * sobraram — é o que impede RG órfão de continuar gravado na execução.

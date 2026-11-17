@@ -172,3 +172,28 @@ export const rgPareceOrgao = (rg: string | undefined | null): boolean =>
  */
 export const pessoaSelecionavel = (p: Pessoa): boolean =>
   p.ativo !== false && p.nome.trim().length > 0 && !rgPareceOrgao(p.rg)
+
+/**
+ * RGs de equipe gravados nos campos fixos da execução (rg1..rg6), já limpos.
+ *
+ * Junta o filtro de formato e o de órgão emissor num lugar só: quem lê a
+ * equipe (tela, home, restauração de rota) precisa da MESMA resposta, senão a
+ * tela conta 2 pessoas e o resto do app conta 1.
+ */
+export function extrairRgs(camposFixos: Record<string, string>): string[] {
+  const vistos = new Set<string>()
+  const lista: string[] = []
+  for (let i = 1; i <= 6; i++) {
+    const bruto = (camposFixos[`rg${i}`] ?? '').trim()
+    if (!RG_VALIDO.test(bruto)) continue
+    // Órgão emissor gravado no lugar do RG ("R SSP"): não é gente, e deixar
+    // passar aqui faz o chip "Fora do cadastro" renascer a cada releitura da
+    // ficha, mesmo depois de removido da tela.
+    if (rgPareceOrgao(bruto)) continue
+    const chave = bruto.replace(/[^0-9a-z]/gi, '').toLowerCase()
+    if (vistos.has(chave)) continue
+    vistos.add(chave)
+    lista.push(bruto)
+  }
+  return lista
+}

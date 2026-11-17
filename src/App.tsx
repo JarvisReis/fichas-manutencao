@@ -3,7 +3,7 @@ import type { DefinicaoFicha, Execucao } from './types'
 import { db, gerarCodigo, limparRascunhosVencidos, limparRgOrgaoGravado } from './lib/db'
 import { getFicha } from './config/fichas'
 import { lerEquipamentos, lerPessoas, type Equipamento } from './lib/cadastros'
-import { podeEditarExecucao } from './lib/permissoes'
+import { identificacaoCompleta, podeEditarExecucao } from './lib/permissoes'
 import { useSessao } from './lib/sessao'
 import SeletorSessao from './components/SeletorSessao'
 import TelaHome from './pages/TelaHome'
@@ -96,6 +96,14 @@ export default function App() {
     setRotaState({ nome: 'home' })
     window.close()
   }, [sairSessao])
+
+  /**
+   * Recado para a home quando a tela pedida não pôde ser aberta.
+   *
+   * Antes a queda para a home era muda: o técnico tocava no equipamento, caía
+   * na lista e achava que tinha errado o toque. Agora o app diz o que houve.
+   */
+  const [aviso, setAviso] = useState<string | null>(null)
 
   // Quantas pessoas existem no cadastro. Com zero, o administrador ainda não
   // existe e o app precisa abrir a tela de cadastros — senão nasce trancado.
@@ -195,13 +203,24 @@ export default function App() {
 
     const ultima = doEquipamento[0]
     const ficha = getFicha(ultima.fichaId)
-    if (!ficha) return
+    if (!ficha) {
+      setAviso(
+        `A ficha da última manutenção de ${nome} não existe mais neste aparelho. Atualize o app ou abra uma manutenção nova.`,
+      )
+      return
+    }
 
     // Rascunho abre para edição (é trabalho em andamento); concluída abre em
     // leitura, com o botão de nova manutenção no rodapé.
     if (ultima.status === 'rascunho') {
       if (!podeEditarExecucao(ultima, sessao, ultima.criadaPor).pode) {
         await novaExecucaoDoEquipamento(equipamento)
+        return
+      }
+      // Rascunho com identificação pela metade volta para a identificação: as
+      // medições só abrem com local, tipo e equipe completos.
+      if (!identificacaoCompleta(ultima, { exigeMarca: ficha.exigeMarca })) {
+        setRota({ nome: 'identificacao', ficha, execucao: ultima })
         return
       }
       setRota({ nome: 'execucao', ficha, execucao: ultima })
@@ -217,10 +236,22 @@ export default function App() {
    */
   const abrirExecucao = async (id: string) => {
     const execucao = await db.execucoes.get(id)
-    if (!execucao) return
+    if (!execucao) {
+      setAviso('Esta execução não está mais neste aparelho.')
+      return
+    }
     if (!podeEditarExecucao(execucao, sessao, execucao.criadaPor).pode) return
     const ficha = getFicha(execucao.fichaId)
-    if (!ficha) return
+    if (!ficha) {
+      setAviso('A ficha desta execução não existe mais neste aparelho. Atualize o app.')
+      return
+    }
+    // Mesma trava do toque no equipamento: rascunho incompleto não entra em
+    // medições por nenhum caminho.
+    if (!identificacaoCompleta(execucao, { exigeMarca: ficha.exigeMarca })) {
+      setRota({ nome: 'identificacao', ficha, execucao })
+      return
+    }
     setRota({ nome: 'execucao', ficha, execucao })
   }
 
@@ -270,11 +301,17 @@ export default function App() {
     }
     const execucao = await db.execucoes.get(pendente.id)
     if (!execucao) {
+      setAviso('Esta execução não está mais neste aparelho — pode ter sido apagada ou sincronizada em outro.')
       setRotaState({ nome: 'home' })
       return
     }
     const ficha = getFicha(execucao.fichaId)
     if (!ficha) {
+      // Ficha do modelo sumiu do app (versão desatualizada ou id órfão): sem
+      // ela não há o que medir, e o registro precisa ser reaberto pelo admin.
+      setAviso(
+        'A ficha desta execução não existe mais neste aparelho. Atualize o app; se continuar, peça ao administrador para reabrir o registro.',
+      )
       setRotaState({ nome: 'home' })
       return
     }
@@ -287,7 +324,14 @@ export default function App() {
       setRotaState({ nome: 'home' })
       return
     }
-    setRotaState({ nome: pendente.nome as 'identificacao' | 'execucao', ficha, execucao })
+    // Recarregar a página com medições abertas não fura a regra: se a
+    // identificação está incompleta, volta para ela.
+    const completa = identificacaoCompleta(execucao, { exigeMarca: ficha.exigeMarca })
+    const destino = completa ? (pendente.nome as 'identificacao' | 'execucao') : 'identificacao'
+    // Com `setRota` a URL acompanha: se a identificação barrou a entrada em
+    // medições, o endereço passa a dizer `identificacao`, senão recarregar de
+    // novo repetiria a correção e a URL ficaria mentindo.
+    setRota({ nome: destino, ficha, execucao })
   }, [sessao])
 
   // Na abertura, depois da limpeza: a URL é a fonte da verdade.
@@ -492,6 +536,8 @@ export default function App() {
             </div>
           )}
           <TelaHome
+          aviso={aviso}
+          onFecharAviso={() => setAviso(null)}
           online={online}
           sessao={sessao}
           onEntrar={() => setIdentificando(true)}

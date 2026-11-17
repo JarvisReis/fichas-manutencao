@@ -1,3 +1,5 @@
+import { extrairRgs } from './cadastros'
+
 /**
  * Janela de correção depois de concluir.
  *
@@ -86,4 +88,34 @@ export function validadeDoRascunho(execucao: ExecucaoMinima, agora: number = Dat
   if (resta <= 0) return ''
   const dias = Math.ceil(resta / 86_400_000)
   return dias === 1 ? '1 dia' : `${dias} dias`
+}
+
+/**
+ * Identificação completa: pode sair da tela de identificação para as medições.
+ *
+ * A ficha é preenchida em dupla e todo registro precisa dizer QUEM mediu, ONDE
+ * e PARA QUÊ. Rascunho existe para sobreviver a recarregar a página, não para
+ * virar atalho: entrar em medições com equipe incompleta produz ficha que não
+ * pode ser concluída depois, e o técnico só descobre no fim.
+ *
+ * O tipo nunca barra: o contrato é "não escolheu, salva como P1".
+ */
+export interface IdentificacaoMinima {
+  local?: string
+  marca?: string
+  tipoManutencao?: string
+  camposFixos: Record<string, string>
+}
+
+export function identificacaoCompleta(
+  execucao: IdentificacaoMinima,
+  opcoes: { exigeMarca?: boolean } = {},
+): boolean {
+  const local = (execucao.local ?? '').trim()
+  const equipe = extrairRgs(execucao.camposFixos).length
+  if (local.length === 0) return false
+  if (equipe < 2) return false
+  if (opcoes.exigeMarca && !(execucao.marca ?? '').trim()) return false
+  if (!execucao.tipoManutencao) return false
+  return true
 }

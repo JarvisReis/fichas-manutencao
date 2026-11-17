@@ -22,6 +22,9 @@ interface Props {
   onAlternarTema: () => void
   temaEscuro: boolean
   online: boolean
+  /** recado de por que uma tela pedida não abriu (ficha que sumiu, execução apagada) */
+  aviso?: string | null
+  onFecharAviso?: () => void
 }
 
 /** Aba escolhida na home, lembrada entre visitas. */
@@ -40,6 +43,8 @@ export default function TelaHome({
   onAlternarTema,
   temaEscuro,
   online,
+  aviso,
+  onFecharAviso,
 }: Props) {
   // Sem identificação o app vai direto para a caixa de entrada: a home não
   // mostra nada, e o caminho é único — identificar-se.
@@ -360,6 +365,23 @@ export default function TelaHome({
       </header>
 
       <div className="space-y-5 p-4">
+        {aviso && (
+          <div
+            role="alert"
+            className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-medium text-amber-900"
+          >
+            <span className="flex-1">{aviso}</span>
+            {onFecharAviso && (
+              <button
+                onClick={onFecharAviso}
+                aria-label="Fechar aviso"
+                className="rounded-lg p-1 text-amber-700 active:bg-amber-100"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+        )}
         {sessao && (
         <section>
           <div className="mb-2 grid grid-cols-2 gap-2">
