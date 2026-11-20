@@ -144,6 +144,45 @@ html.tema-escuro .bg-slate-200 {
   background-color: #253145;
 }
 
+/**
+ * Textos de 900 sobre fundo colorido claro.
+ *
+ * Os blocos de aviso (publicado / pendente / erro) usam `bg-*-50` com
+ * `text-*-900`. O CSS do escuro já cobria `amber-900`, mas não `emerald-900`
+ * nem `red-900`: a mensagem de sucesso e a de erro ficavam quase invisíveis —
+ * texto verde-escuro sobre fundo verde-escuro.
+ */
+html.tema-escuro .text-emerald-900 {
+  color: #a9e5c4;
+}
+html.tema-escuro .text-red-900 {
+  color: #f2b6ba;
+}
+html.tema-escuro .text-emerald-700 {
+  color: #8fd9b3;
+}
+html.tema-escuro .text-blue-700,
+html.tema-escuro .text-blue-800 {
+  color: #a8c6ee;
+}
+html.tema-escuro .text-indigo-700 {
+  color: #c2bdf0;
+}
+
+/* Bordas de aviso: no escuro a borda clara vira um contorno luminoso. */
+html.tema-escuro .border-amber-300 {
+  border-color: #6b5a2a;
+}
+html.tema-escuro .border-emerald-300 {
+  border-color: #2c5941;
+}
+html.tema-escuro .border-emerald-50 {
+  border-color: #2c5941;
+}
+html.tema-escuro .border-red-300 {
+  border-color: #6b2f34;
+}
+
 body {
   margin: 0;
   background: var(--fundo);
