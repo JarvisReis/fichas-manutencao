@@ -6,7 +6,7 @@
 set -euo pipefail
 
 ORIGEM="$(cd "$(dirname "$0")/.." && pwd)/dist"
-DESTINO="/var/www/fichas-metro"
+DESTINO="/var/www/fichas"
 
 # Porta de qualidade: sem typecheck, testes e build verdes, nao publica.
 # (antes o script so conferia se dist/index.html existia)

@@ -15,8 +15,8 @@ projeto sem redescobrir o caminho.
   server/sync-server.mjs     API de sincronização (Node, serviço de sistema, :8787)
   supabase/schema.sql        tabelas, RLS e função meu_nivel()
   scripts/publicar.sh        gate de qualidade + publicação
-/var/www/fichas-metro        conteúdo servido pelo nginx (dono www-data)
-/etc/nginx/sites-available/fichas-metro   listen 127.0.0.1:4173
+/var/www/fichas        conteúdo servido pelo nginx (dono www-data)
+/etc/nginx/sites-available/fichas   listen 127.0.0.1:4173
 /etc/fichas-sync.env         variáveis do sync-server (inclui a service role)
 ```
 
@@ -46,7 +46,7 @@ Prova de que a publicação pegou:
 
 ```bash
 curl -s https://fichas.rreis.app/ | grep -o 'index-[A-Za-z0-9_-]*\.js' | head -1
-grep -o 'index-[A-Za-z0-9_-]*\.js' /var/www/fichas-metro/index.html | head -1
+grep -o 'index-[A-Za-z0-9_-]*\.js' /var/www/fichas/index.html | head -1
 ```
 
 Os dois hashes precisam bater. A API deve responder 401 sem token:

@@ -8,15 +8,15 @@ Internet → Cloudflare Tunnel (cloudflared, root)
              └─ fichasapi.rreis.app → 127.0.0.1:8787  (node server/sync-server.mjs)
 ```
 
-- nginx serve `/var/www/fichas-metro` (build do Vite), systemd **de sistema**: `nginx.service`.
+- nginx serve `/var/www/fichas` (build do Vite), systemd **de sistema**: `nginx.service`.
 - A porta 80 da máquina é do **Pi-hole**. O nginx escuta só em 127.0.0.1:4173 — não conflita.
-- O `vite preview` (`fichas-metro.service`, de usuário) foi **desativado**. Não religar: brigaria pela porta 4173.
+- O `vite preview` (unit de usuário, hoje removida) não deve voltar: brigaria pela porta 4173.
 
 ## Publicar uma alteração
 
 ```bash
 npm run build
-npm run publicar      # rsync dist/ → /var/www/fichas-metro + reload do nginx
+npm run publicar      # rsync dist/ → /var/www/fichas + reload do nginx
 ```
 
 O `publicar` existe porque o home do ricardo é `700` e o nginx roda como `www-data`:
