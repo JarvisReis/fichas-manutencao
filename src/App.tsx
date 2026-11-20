@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MARCA_CONTATOR, type DefinicaoFicha, type Execucao } from './types'
 import { db, gerarCodigo, lerEndpointSync, limparRascunhosVencidos, limparRgOrgaoGravado, migrarChaveMarca } from './lib/db'
-import { lerToken, limparSessaoAuth } from './lib/auth'
+import { garantirTokenValido, lerToken, limparSessaoAuth } from './lib/auth'
 import { montarBackup } from './lib/backup'
 // O PDF só é baixado quando alguém pede: jsPDF + html2canvas ficam fora do
 // bundle inicial (dynamic import).
@@ -282,6 +282,22 @@ export default function App() {
     const sincronizar = async () => {
       const base = lerEndpointSync()
       if (!base) return
+      /**
+       * Token de acesso do Supabase vence em 1 hora.
+       *
+       * Sem renovar aqui, o app continuava "logado" com um token vencido e toda
+       * sincronização morria em 401 sem avisar: o técnico só via dado novo
+       * depois de sair da conta e entrar de novo. Atualizar a página não
+       * resolvia porque o token vencido continuava no aparelho.
+       */
+      const sessaoValida = await garantirTokenValido()
+      if (cancelado) return
+      if (!sessaoValida) {
+        // Renovação recusada (refresh vencido, conta desativada): não adianta
+        // insistir. Manda entrar de novo, em vez de falhar calado.
+        if (!lerToken() && sessao) sair()
+        return
+      }
       const equipe = await baixarEquipe(base)
       if (cancelado) return
       // Só substitui a lista quando o servidor realmente devolve gente: lista
@@ -371,7 +387,7 @@ export default function App() {
       window.removeEventListener('online', sincronizar)
       document.removeEventListener('visibilitychange', sincronizar)
     }
-  }, [sessao, ehAdministrador])
+  }, [sessao, ehAdministrador, sair])
 
   /**
    * Abre uma execução a partir do contator escolhido: a ficha e o local vêm do

@@ -47,6 +47,79 @@ export function limparSessaoAuth() {
   }
 }
 
+/**
+ * Quando o token de acesso vence (epoch em segundos), lido do próprio JWT.
+ *
+ * O Supabase emite token de 1 hora. Sem olhar isso, o app ficava com um token
+ * vencido no localStorage, continuava se achando logado, e toda sincronização
+ * falhava em silêncio com 401 — o técnico só via os dados atualizarem depois de
+ * sair da conta e entrar de novo.
+ */
+export function venceEm(token: string | null): number | null {
+  if (!token) return null
+  const partes = token.split('.')
+  if (partes.length < 2) return null
+  try {
+    const base64 = partes[1].replace(/-/g, '+').replace(/_/g, '/')
+    const json = JSON.parse(atob(base64)) as { exp?: number }
+    return typeof json.exp === 'number' ? json.exp * 1000 : null
+  } catch {
+    return null
+  }
+}
+
+/** O token vence dentro da margem? Margem cobre o tempo da própria chamada. */
+export function tokenVencendo(token: string | null, margemMs = 120_000): boolean {
+  const exp = venceEm(token)
+  if (exp === null) return true
+  return Date.now() + margemMs >= exp
+}
+
+/**
+ * Garante um token de acesso válido, renovando com o refresh_token.
+ *
+ * Chamado antes de sincronizar. Se a renovação falhar (refresh vencido, conta
+ * desativada), limpa a sessão e devolve `false` — quem chamou deve mandar a
+ * pessoa entrar de novo, em vez de seguir tentando contra um servidor que
+ * responde 401 e não explicar nada.
+ */
+export async function garantirTokenValido(): Promise<boolean> {
+  const token = lerToken()
+  if (token && !tokenVencendo(token)) return true
+  if (!supabaseConfigurado()) return false
+  const refresh = (() => {
+    try {
+      return localStorage.getItem(CHAVE_REFRESH)
+    } catch {
+      return null
+    }
+  })()
+  if (!refresh) {
+    if (token) limparSessaoAuth()
+    return false
+  }
+  try {
+    const r = await pedir('/auth/v1/token?grant_type=refresh_token', { refresh_token: refresh })
+    if (!r.ok) {
+      limparSessaoAuth()
+      return false
+    }
+    const dados = (await r.json().catch(() => ({}))) as {
+      access_token?: string
+      refresh_token?: string
+    }
+    if (!dados.access_token) {
+      limparSessaoAuth()
+      return false
+    }
+    guardarSessaoAuth(dados.access_token, dados.refresh_token)
+    return true
+  } catch {
+    // sem rede: não apaga a sessão, só não sincroniza agora
+    return Boolean(token) && !tokenVencendo(token)
+  }
+}
+
 export interface ResultadoAuth {
   ok: boolean
   erro?: string
