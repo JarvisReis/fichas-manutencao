@@ -507,7 +507,7 @@ function json(res, status, dados) {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, X-Client-Info',
-    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
   })
   res.end(JSON.stringify(dados))
 }
@@ -700,7 +700,16 @@ const servidor = http.createServer(async (req, res) => {
       return json(res, 200, await lerAjustesDeFichas())
     }
 
-    if (req.method === 'PUT' && url.pathname === '/fichas-ajustes') {
+    /**
+     * Aceita PUT e POST de propósito.
+     *
+     * O PUT é o certo semanticamente, mas o CORS do serviço anunciava só
+     * GET/POST/DELETE: o navegador barrava o preflight do PUT e o administrador
+     * via "Failed to fetch" ao salvar a ficha, com o ajuste ficando preso no
+     * aparelho. Além de liberar o PUT no CORS, esta rota aceita POST para não
+     * depender de proxy/CDN que reescreva método.
+     */
+    if ((req.method === 'PUT' || req.method === 'POST') && url.pathname === '/fichas-ajustes') {
       const quem = await exigirAdministrador(req)
       return json(res, 200, await gravarAjustesDeFichas(quem, await corpo(req)))
     }
