@@ -137,13 +137,27 @@ async function usuarioDoToken(req) {
 async function baixarHistorico(quem, { desde, limite }) {
   const filtros = [
     'select=*',
+    /**
+     * Só ficha fechada desce para todo mundo.
+     *
+     * Rascunho é trabalho em andamento e continua vivendo no aparelho de quem
+     * começou. Fechada é registro do serviço: precisa aparecer em qualquer
+     * aparelho, senão o mesmo equipamento aparecia manutenido para um e em
+     * aberto para outro.
+     */
     'status=in.(concluida,pendente)',
     `order=atualizada_em.desc`,
     `limit=${limite}`,
   ]
-  if (quem.nivel !== 'administrador') {
-    filtros.push(`criada_por=eq.${encodeURIComponent(quem.id)}`)
-  }
+  /**
+   * Não filtra mais por autor.
+   *
+   * Antes o técnico só baixava o que ele mesmo tinha executado, então a ficha
+   * que o administrador concluía no aparelho dele não descia no aparelho do
+   * técnico — o mesmo contator ficava "concluído" de um lado e "rascunho" do
+   * outro. Leitura de ficha fechada é do time; EDIÇÃO continua restrita (o app
+   * só libera para o administrador ou para o autor dentro de 24 h).
+   */
   if (desde) filtros.push(`atualizada_em=gt.${encodeURIComponent(desde)}`)
 
   const linhas = await servico(`/execucoes?${filtros.join('&')}`)
