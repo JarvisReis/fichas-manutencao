@@ -116,3 +116,19 @@ describe('nucleosEmBranco', () => {
     ])
   })
 })
+
+describe('nucleosEmBranco na P2 sem manutenção anterior', () => {
+  it('contator na primeira P2 não é obrigado a ter núcleo retirado', () => {
+    // Não há ficha anterior: o campo vem vazio de propósito, e exigir travaria
+    // a ficha por um dado que não existe.
+    expect(nucleosEmBranco(true, 'HPB007', '', false)).toEqual([])
+  })
+
+  it('havendo manutenção anterior, o retirado volta a ser obrigatório', () => {
+    expect(nucleosEmBranco(true, 'HPB007', '', true)).toEqual(['Nº Série do Núcleo — Retirado'])
+  })
+
+  it('o instalado continua obrigatório nos dois casos', () => {
+    expect(nucleosEmBranco(true, '', '', false)).toEqual(['Nº Série do Núcleo — Instalado'])
+  })
+})

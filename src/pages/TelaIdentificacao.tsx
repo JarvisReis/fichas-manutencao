@@ -92,6 +92,17 @@ export default function TelaIdentificacao({
   const [tipoEscolhido, setTipoEscolhido] = useState(Boolean(execucao.tipoManutencao))
   const [equipamentoNome, setEquipamentoNome] = useState(execucao.camposFixos.equipamento ?? '')
   const [nucleoInstalado, setNucleoInstalado] = useState(execucao.nucleoInstalado ?? '')
+  /**
+   * Existe núcleo da manutenção anterior para retirar?
+   *
+   * Numa P2 ele é o núcleo retirado (auto-preenchido). Se o contator nunca foi
+   * mantido, não há o que retirar e o campo pode ficar vazio — a exceção
+   * combinada. Guardamos o fato para a conferência não exigir um dado que não
+   * existe.
+   */
+  const [nucleoAnteriorConhecido, setNucleoAnteriorConhecido] = useState(
+    Boolean(execucao.camposFixos.serieRetirado),
+  )
   const [nucleoRetirado, setNucleoRetirado] = useState(
     execucao.tipoManutencao === 'P2' ? (execucao.camposFixos.serieRetirado ?? '') : '',
   )
@@ -144,8 +155,12 @@ export default function TelaIdentificacao({
     })()
   }, [ficha.id])
 
-  // Núcleo instalado: vem da última manutenção do equipamento e só muda na P2.
-  // Na P1 o campo fica somente leitura; na P2 é editável (troca de núcleo).
+  // Núcleo: a P2 troca o núcleo, então os dois campos têm origens diferentes.
+  //  - P1 (e demais): o núcleo em uso vem da última manutenção e fica só leitura.
+  //  - P2: o núcleo da última manutenção é justamente o RETIRADO (auto-preenchido),
+  //    e o campo INSTALADO nasce vazio, esperando a série do núcleo novo.
+  //    Sem ficha anterior não há o que retirar: o campo fica vazio, e isso é a
+  //    exceção prevista — não erro.
   useEffect(() => {
     const equipamento = (execucao.camposFixos.equipamento ?? '').trim()
     if (!equipamento || execucao.nucleoInstalado) return
@@ -157,8 +172,16 @@ export default function TelaIdentificacao({
         const doServidor = await lerNucleoDoServidor(endpoint, equipamento)
         if (cancelado) return
         if (doServidor) {
-          setNucleoInstalado(doServidor)
-          onAtualizar({ nucleoInstalado: doServidor })
+          setNucleoAnteriorConhecido(true)
+          if (ehP2) {
+            if (!nucleoRetirado.trim()) {
+              setNucleoRetirado(doServidor)
+              salvarCampos({ camposFixos: { ...camposFixos, serieRetirado: doServidor } })
+            }
+          } else {
+            setNucleoInstalado(doServidor)
+            onAtualizar({ nucleoInstalado: doServidor })
+          }
           return
         }
       }
@@ -170,6 +193,15 @@ export default function TelaIdentificacao({
         atualizadaEm: execucao.atualizadaEm,
       })
       if (cancelado || !anterior) return
+      setNucleoAnteriorConhecido(true)
+      // Mesma regra da fonte do servidor: na P2 o núcleo anterior é o retirado.
+      if (ehP2) {
+        if (!nucleoRetirado.trim()) {
+          setNucleoRetirado(anterior)
+          salvarCampos({ camposFixos: { ...camposFixos, serieRetirado: anterior } })
+        }
+        return
+      }
       setNucleoInstalado(anterior)
       onAtualizar({ nucleoInstalado: anterior })
     })()
@@ -336,8 +368,11 @@ export default function TelaIdentificacao({
       if (campo.id === 'serieInstalado' || campo.id === 'serieRetirado') continue
       if (!(camposFixos[campo.id] ?? '').trim()) lista.push(campo.nome)
     }
-    // Núcleos: instalado sempre obrigatório, retirado só na P2.
-    lista.push(...nucleosEmBranco(ehP2, nucleoInstalado, nucleoRetirado))
+    // Núcleos: instalado sempre obrigatório; retirado só na P2 e só quando
+    // existe manutenção anterior de onde ele venha.
+    lista.push(
+      ...nucleosEmBranco(ehP2, nucleoInstalado, nucleoRetirado, nucleoAnteriorConhecido),
+    )
     if (!local.trim()) lista.push('Local')
     if (equipe.length === 0) lista.push('Equipe')
     return lista
@@ -710,7 +745,11 @@ export default function TelaIdentificacao({
                     </option>
                   ))}
                 </select>
-                {!ehP2 && (
+                {ehP2 ? (
+                  <span className="mt-1 block text-[11px] text-slate-500">
+                    Informe a série do núcleo <strong>novo</strong> — o que entra no contator
+                  </span>
+                ) : (
                   <span className="mt-1 block text-[11px] text-slate-500">
                     {nucleoInstalado
                       ? 'Registrado na última manutenção · somente leitura'
@@ -736,6 +775,17 @@ export default function TelaIdentificacao({
                       </option>
                     ))}
                   </select>
+                  {/**
+                   * O retirado vem preenchido com o núcleo da última manutenção
+                   * — é o que estava no contator antes da troca. Sem ficha
+                   * anterior não há o que retirar, e o campo fica vazio de
+                   * propósito: é a exceção prevista, não falta de dado.
+                   */}
+                  <span className="mt-1 block text-[11px] text-slate-500">
+                    {nucleoRetirado
+                      ? 'Preenchido com o núcleo da última manutenção · pode corrigir se o registro estiver errado'
+                      : 'Sem manutenção anterior registrada para este contator · selecione se houver núcleo a retirar'}
+                  </span>
                 </label>
               )}
             </div>

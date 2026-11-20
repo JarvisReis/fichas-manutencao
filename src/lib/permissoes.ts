@@ -130,16 +130,21 @@ export function podeApagarRascunho(
  * para as medições.
  *
  * Regra: núcleo instalado é sempre obrigatório; retirado só na P2, onde ele é o
- * registro da peça que saiu do contator.
+ * registro da peça que saiu do contator — e só quando existe manutenção
+ * anterior de onde ele venha. Contator na primeira P2 não tem o que retirar, e
+ * exigir a série ali travaria a ficha por um dado que não existe.
  */
 export function nucleosEmBranco(
   ehP2: boolean,
   instalado: string | undefined,
   retirado: string | undefined,
+  exigirRetirado = true,
 ): string[] {
   const faltando: string[] = []
   if (!(instalado ?? '').trim()) faltando.push('Nº Série do Núcleo — Instalado')
-  if (ehP2 && !(retirado ?? '').trim()) faltando.push('Nº Série do Núcleo — Retirado')
+  if (ehP2 && exigirRetirado && !(retirado ?? '').trim()) {
+    faltando.push('Nº Série do Núcleo — Retirado')
+  }
   return faltando
 }
 
