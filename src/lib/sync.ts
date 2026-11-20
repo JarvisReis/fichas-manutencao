@@ -20,6 +20,16 @@ export type ResultadoExportado = 'conforme' | 'nao_conforme' | 'na'
 export const FORMATO_ENVIO = 'fichas-execucao'
 export const VERSAO_ENVIO = 3
 
+/**
+ * Quantas fichas o `/historico` traz por vez.
+ *
+ * O número não é detalhe: quando a resposta vem truncada neste limite, a
+ * ausência de uma ficha local não significa que ela foi apagada no servidor —
+ * significa que ficou fora da página. A reconciliação de exclusões usa esse
+ * valor como trava.
+ */
+export const LIMITE_HISTORICO = 500
+
 export interface ExecucaoExportada {
   formato: typeof FORMATO_ENVIO
   versao: typeof VERSAO_ENVIO
@@ -122,6 +132,8 @@ export interface ResultadoEnvio {
 export interface ResultadoHistorico {
   ok: boolean
   baixadas: number
+  /** fichas locais removidas porque não existem mais no servidor */
+  removidas: number
   erro?: string
 }
 
@@ -137,14 +149,14 @@ export interface ResultadoHistorico {
  * aparelho de quem começou.
  */
 export async function baixarHistorico(endpoint: string): Promise<ResultadoHistorico> {
-  if (!lerToken()) return { ok: false, baixadas: 0, erro: 'sem sessão' }
+  if (!lerToken()) return { ok: false, baixadas: 0, removidas: 0, erro: 'sem sessão' }
   try {
-    const url = `${endpoint.replace(/\/$/, '')}/historico`
+    const url = `${endpoint.replace(/\/$/, '')}/historico?limite=${LIMITE_HISTORICO}`
     const r = await fetch(url, { headers: cabecalhos() })
     if (r.status === 401 || r.status === 403) {
-      return { ok: false, baixadas: 0, erro: 'sem permissão' }
+      return { ok: false, baixadas: 0, removidas: 0, erro: 'sem permissão' }
     }
-    if (!r.ok) return { ok: false, baixadas: 0, erro: `HTTP ${r.status}` }
+    if (!r.ok) return { ok: false, baixadas: 0, removidas: 0, erro: `HTTP ${r.status}` }
     const dados = (await r.json()) as { execucoes?: Execucao[]; equipamentos?: unknown[] }
     const lista = Array.isArray(dados.execucoes) ? dados.execucoes : []
     let baixadas = 0
@@ -168,10 +180,54 @@ export async function baixarHistorico(endpoint: string): Promise<ResultadoHistor
     if (Array.isArray(dados.equipamentos)) {
       await gravarEquipamentos(dados.equipamentos as Equipamento[])
     }
-    return { ok: true, baixadas }
+    return { ok: true, baixadas, removidas: await reconciliarExclusoes(lista), erro: undefined }
   } catch (e) {
-    return { ok: false, baixadas: 0, erro: (e as Error).message }
+    return { ok: false, baixadas: 0, removidas: 0, erro: (e as Error).message }
   }
+}
+
+/**
+ * Remove daqui a ficha que não existe mais no servidor.
+ *
+ * O caso real: uma ficha concluída foi apagada no servidor e continuou para
+ * sempre neste aparelho, na home, como se fosse trabalho válido — o mesmo
+ * equipamento aparecia "concluído" aqui e "rascunho" no outro aparelho, e
+ * ninguém sabia qual valia.
+ *
+ * Três travas para não apagar trabalho de ninguém:
+ *  - só ficha que já sincronizou (`sincronizada`), porque o que ainda não subiu
+ *    pode simplesmente não estar no servidor ainda;
+ *  - só ficha fechada (concluída/pendente), que é o conjunto que o `/historico`
+ *    devolve — rascunho não vinha na resposta, então sua ausência não diz nada;
+ *  - só quando a resposta veio inteira (sem truncar no limite).
+ */
+async function reconciliarExclusoes(lista: Execucao[]): Promise<number> {
+  const truncada = lista.length >= LIMITE_HISTORICO
+  const noServidor = new Set(lista.map((e) => e.id))
+  const locais = await db.execucoes.toArray()
+  let removidas = 0
+  for (const local of locais) {
+    if (!deveRemoverLocal(local, noServidor, truncada)) continue
+    await db.execucoes.delete(local.id)
+    removidas++
+  }
+  return removidas
+}
+
+/**
+ * A regra pura da reconciliação, separada da base para poder ser testada.
+ *
+ * Errar aqui apaga ficha de campo — é o tipo de erro que não tem desfazer.
+ */
+export function deveRemoverLocal(
+  local: Pick<Execucao, 'id' | 'status' | 'sincronizada'>,
+  idsDoServidor: Set<string>,
+  respostaTruncada: boolean,
+): boolean {
+  if (respostaTruncada) return false
+  if (!local.sincronizada) return false
+  if (local.status === 'rascunho') return false
+  return !idsDoServidor.has(local.id)
 }
 
 /**
