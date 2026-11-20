@@ -219,3 +219,16 @@ body {
 .anim-aparecer {
   animation: aparecer 180ms ease-out;
 }
+
+/**
+ * Destaque de texto dentro do manual.
+ *
+ * O realce precisa acompanhar o tema. Antes era uma classe de cor fixa no
+ * próprio <strong>, e o tema escuro — que sobrescreve utilitários, não
+ * elementos — não alcançava: o negrito ficava escuro sobre fundo escuro e
+ * desaparecia da tela.
+ */
+.manual strong {
+  color: var(--texto-forte);
+  font-weight: 600;
+}

@@ -215,7 +215,14 @@ function Secao({ titulo, children }: { titulo: string; children: React.ReactNode
   return (
     <section className="rounded-2xl border-2 border-slate-200 bg-white p-4">
       <h2 className="mb-2 text-sm font-bold text-slate-900">{titulo}</h2>
-      <div className="space-y-2 text-xs leading-relaxed text-slate-600 [&_li]:ml-4 [&_li]:list-disc [&_ol_li]:list-decimal [&_strong]:text-slate-900">
+      {/**
+         * Sem `[&_strong]:text-slate-900` aqui: essa variante aplica a cor
+         * escura direto no <strong>, e o tema escuro só sobrescreve quem tem a
+         * classe — o negrito virava texto escuro em fundo escuro, os "buracos"
+         * que apareciam no manual. O destaque agora vem da classe `manual`,
+         * definida no CSS com a variável do tema.
+         */}
+      <div className="manual space-y-2 text-xs leading-relaxed text-slate-600 [&_li]:ml-4 [&_li]:list-disc [&_ol_li]:list-decimal">
         {children}
       </div>
     </section>
