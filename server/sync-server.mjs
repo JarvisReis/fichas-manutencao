@@ -425,6 +425,68 @@ async function gravarEquipamentos(equipamentos) {
 
 /* ---------------------------------- HTTP ---------------------------------- */
 
+/** Chave única em `configuracoes` para os ajustes das fichas. */
+const CHAVE_AJUSTES = 'fichas-ajustes'
+
+/** Lê os ajustes publicados. Qualquer usuário autenticado recebe. */
+async function lerAjustesDeFichas() {
+  const linhas = await servico(
+    `/configuracoes?chave=eq.${CHAVE_AJUSTES}&select=valor,atualizado_em,atualizado_por`,
+  )
+  const linha = linhas?.[0]
+  if (!linha) return { ajustes: {}, atualizadoEm: null, atualizadoPor: null }
+  const ajustes = linha.valor && typeof linha.valor === 'object' ? linha.valor.ajustes : null
+  return {
+    ajustes: ajustes && typeof ajustes === 'object' && !Array.isArray(ajustes) ? ajustes : {},
+    atualizadoEm: linha.atualizado_em ?? null,
+    atualizadoPor: linha.atualizado_por ?? null,
+  }
+}
+
+/**
+ * Publica os ajustes. Só administrador — e o corpo é revalidado aqui, porque
+ * quem chama a API pode não ser o app.
+ */
+async function gravarAjustesDeFichas(quem, dados) {
+  const ajustes = dados?.ajustes
+  if (!ajustes || typeof ajustes !== 'object' || Array.isArray(ajustes)) {
+    throw new ErroHttp(400, 'envie { ajustes: { <idDaFicha>: { ... } } }')
+  }
+  const chaves = Object.keys(ajustes)
+  if (chaves.length > 200) throw new ErroHttp(400, 'ajustes demais')
+  for (const id of chaves) {
+    const ajuste = ajustes[id]
+    if (!ajuste || typeof ajuste !== 'object' || Array.isArray(ajuste)) {
+      throw new ErroHttp(400, `ajuste inválido para a ficha ${id}`)
+    }
+    if (ajuste.itens !== undefined && !Array.isArray(ajuste.itens)) {
+      throw new ErroHttp(400, `itens inválidos na ficha ${id}`)
+    }
+  }
+
+  const agora = new Date().toISOString()
+  await servico('/configuracoes?on_conflict=chave', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Prefer: 'resolution=merge-duplicates,return=minimal',
+    },
+    body: JSON.stringify([
+      { chave: CHAVE_AJUSTES, valor: { ajustes }, atualizado_em: agora, atualizado_por: quem.id },
+    ]),
+  })
+
+  /**
+   * Devolve o que foi gravado, não o que foi enviado.
+   *
+   * O aparelho do administrador guarda este `atualizadoEm` como marcador da
+   * versão em vigor. Se o servidor arredondasse ou mudasse o carimbo, o próprio
+   * autor baixaria a versão "nova" a cada abertura e reescreveria o IndexedDB
+   * dele sem necessidade.
+   */
+  return { ok: true, atualizadoEm: agora, atualizadoPor: quem.id, autor: quem.nome ?? null }
+}
+
 function json(res, status, dados) {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
@@ -606,6 +668,28 @@ const servidor = http.createServer(async (req, res) => {
      * O Supabase manda o e-mail com um link para a pessoa definir a própria
      * senha. Ninguém no time chega a conhecer a senha de outra pessoa.
      */
+    /**
+     * Ajustes das fichas — limites de medição, itens, nomes.
+     *
+     * A ficha em vigor é `padrão do código + ajuste`. O ajuste até aqui morava
+     * só no IndexedDB de quem editava: o administrador revisava um limite e os
+     * técnicos seguiam medindo pelo limite velho, sem nada indicando isso. Numa
+     * ficha de conformidade essa é a pior divergência possível — o resultado
+     * "conforme" de um aparelho não vale no outro.
+     *
+     * Agora o ajuste vive em `configuracoes` (chave 'fichas-ajustes'): desce
+     * para todo aparelho autenticado e só o administrador escreve.
+     */
+    if (req.method === 'GET' && url.pathname === '/fichas-ajustes') {
+      await quemChama(req)
+      return json(res, 200, await lerAjustesDeFichas())
+    }
+
+    if (req.method === 'PUT' && url.pathname === '/fichas-ajustes') {
+      const quem = await exigirAdministrador(req)
+      return json(res, 200, await gravarAjustesDeFichas(quem, await corpo(req)))
+    }
+
     if (req.method === 'POST' && url.pathname === '/admin/convite') {
       await exigirAdministrador(req)
       const { email, nome, rg, funcao, nivel, ativo } = await corpo(req)

@@ -9,9 +9,9 @@ async function baixarPdfRelatorio(args: Parameters<typeof import('./lib/pdfRelat
   const mod = await import('./lib/pdfRelatorio')
   return mod.baixarPdfRelatorio(args)
 }
-import { baixarEquipe, baixarEquipamentos, baixarHistorico, enviarBackupAutomatico, enviarEquipamentos, enviarExecucao, sincronizarPendentes } from './lib/sync'
+import { baixarAjustesDeFichas, baixarEquipe, baixarEquipamentos, baixarHistorico, enviarBackupAutomatico, enviarEquipamentos, enviarExecucao, publicarAjustesDeFichas, sincronizarPendentes } from './lib/sync'
 import { definirFichasEmVigor, getFicha } from './config/fichas'
-import { fichasEmVigor, lerFichasAjustadas } from './lib/fichasEditadas'
+import { deveAplicarRemoto, fichasEmVigor, gravarFichasAjustadas, gravarVersaoAplicada, lerFichasAjustadas, lerPublicacaoPendente, lerVersaoAplicada, marcarPublicacaoPendente } from './lib/fichasEditadas'
 import { chaveDoEquipamento, gravarEquipamentos, gravarPessoas, lerEquipamentos, lerPessoas, type Equipamento, type Pessoa } from './lib/cadastros'
 import { identificacaoCompleta, podeEditarExecucao } from './lib/permissoes'
 import { useSessao } from './lib/sessao'
@@ -236,6 +236,48 @@ export default function App() {
      */
     if (!lerToken()) return
     let cancelado = false
+
+    /**
+     * Fichas em vigor — limite de medição, itens, nomes.
+     *
+     * A ordem é: publica o que este aparelho tem pendente, depois baixa. Ao
+     * contrário, a alteração feita sem rede pelo administrador seria apagada
+     * pelo que está no servidor no instante em que ele voltasse a ter sinal.
+     *
+     * Se a publicação pendente falhar, o download é cancelado de propósito: é
+     * melhor a equipe ficar na versão antiga por mais um tempo do que perder a
+     * revisão de limite que ninguém conseguiu enviar.
+     */
+    const sincronizarAjustesDeFichas = async (base: string) => {
+      const pendente = await lerPublicacaoPendente().catch(() => false)
+      if (pendente) {
+        if (!ehAdministrador) {
+          await marcarPublicacaoPendente(false).catch(() => undefined)
+        } else {
+          const ajustes = await lerFichasAjustadas().catch(() => ({}))
+          const envio = await publicarAjustesDeFichas(base, ajustes)
+          if (!envio.ok) return
+          await marcarPublicacaoPendente(false).catch(() => undefined)
+          if (envio.atualizadoEm) {
+            await gravarVersaoAplicada(envio.atualizadoEm).catch(() => undefined)
+          }
+        }
+      }
+
+      const baixados = await baixarAjustesDeFichas(base)
+      if (!baixados.ok || !baixados.dados) return
+
+      const aplicada = await lerVersaoAplicada().catch(() => null)
+      if (!deveAplicarRemoto(aplicada, baixados.dados.atualizadoEm)) return
+
+      await gravarFichasAjustadas(baixados.dados.ajustes)
+      if (baixados.dados.atualizadoEm) {
+        await gravarVersaoAplicada(baixados.dados.atualizadoEm).catch(() => undefined)
+      }
+      // A tela de execução já acha a ficha nova sem recarregar.
+      definirFichasEmVigor(fichasEmVigor(baixados.dados.ajustes))
+    }
+
     const sincronizar = async () => {
       const base = lerEndpointSync()
       if (!base) return
@@ -286,6 +328,12 @@ export default function App() {
         if (novos.length > 0) await enviarEquipamentos(base, novos as unknown[])
         if (cancelado) return
       }
+      /**
+       * Fichas antes do histórico: a ficha em vigor decide como o resultado é
+       * avaliado, então precisa estar atualizada quando as execuções descem.
+       */
+      await sincronizarAjustesDeFichas(base)
+      if (cancelado) return
       // Depois de subir a fila, traz o que os outros aparelhos gravaram: sem
       // isso a home deste computador ficava sem recentes e sem histórico.
       await baixarHistorico(base)

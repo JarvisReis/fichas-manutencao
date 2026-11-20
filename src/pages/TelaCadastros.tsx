@@ -5,7 +5,9 @@ import EditorFichas from './EditorFichas'
 import {
   fichasEmVigor,
   gravarFichasAjustadas,
+  gravarVersaoAplicada,
   lerFichasAjustadas,
+  marcarPublicacaoPendente,
   type FichasAjustadas,
 } from '../lib/fichasEditadas'
 import {
@@ -23,7 +25,7 @@ import {
 } from '../lib/cadastros'
 import { ShieldCheck, User as UserIcon, CloudUpload, CloudOff } from 'lucide-react'
 import { db, fichaZerada } from '../lib/db'
-import { enviarEquipamentos, enviarPessoas } from '../lib/sync'
+import { enviarEquipamentos, enviarPessoas, publicarAjustesDeFichas } from '../lib/sync'
 import { convidarTecnico, reenviarConvite } from '../lib/auth'
 import { emailValido } from '../lib/cadastros'
 import { gravarVersao } from '../lib/cadastros'
@@ -118,12 +120,15 @@ export default function TelaCadastros({ onVoltar, administrador, abaInicial }: P
   }
 
   /**
-   * Ajuste de ficha não vai para o servidor.
+   * Salvar a ficha publica a nova versão para a equipe.
    *
-   * O servidor hoje replica equipamentos e equipe; publicar definição de ficha
-   * exigiria tabela e rota novas. Enquanto isso não existe, o ajuste vale no
-   * aparelho do administrador — e o aviso deixa claro que não é compartilhado,
-   * em vez de fingir que foi.
+   * Antes o ajuste ficava só neste aparelho: o limite revisado pelo
+   * administrador não chegava em ninguém, e cada técnico media por uma régua
+   * diferente sem nada avisando. Numa ficha de conformidade isso é grave — o
+   * "conforme" de um aparelho não valia no outro.
+   *
+   * Sem rede, o ajuste vale aqui na hora e fica marcado como pendente: a
+   * próxima sincronização publica antes de baixar qualquer coisa.
    */
   const salvarFichas = async (ajustes: FichasAjustadas) => {
     setAjustesFichas(ajustes)
@@ -131,10 +136,21 @@ export default function TelaCadastros({ onVoltar, administrador, abaInicial }: P
     // A ficha em vigor muda na hora: sem isso a tela de execução continuaria
     // com a definição antiga até recarregar.
     definirFichasEmVigor(fichasEmVigor(ajustes))
-    setAvisoEnvio({
-      erro: true,
-      texto: 'Ficha salva neste aparelho. Ainda não é compartilhada com a equipe.',
-    })
+    await marcarPublicacaoPendente(true)
+    const envio = await publicarAjustesDeFichas(obterEndpointAdmin(), ajustes)
+    if (envio.ok) {
+      await marcarPublicacaoPendente(false)
+      if (envio.atualizadoEm) await gravarVersaoAplicada(envio.atualizadoEm)
+      setAvisoEnvio({
+        erro: false,
+        texto: 'Ficha publicada para a equipe — os outros aparelhos recebem na próxima sincronização.',
+      })
+    } else {
+      setAvisoEnvio({
+        erro: true,
+        texto: `Ficha salva neste aparelho. Publicação pendente (${envio.erro ?? 'sem rede'}).`,
+      })
+    }
   }
 
   if (!carregado) {

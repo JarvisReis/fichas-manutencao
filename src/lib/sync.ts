@@ -4,6 +4,7 @@ import { lerToken } from './auth'
 import { getFicha } from '../config/fichas'
 import { avaliarItem, limiteExibido } from './conformidade'
 import { gravarEquipamentos, type Equipamento } from './cadastros'
+import type { FichasAjustadas } from './fichasEditadas'
 import type { DefinicaoFicha, Execucao, Marca } from '../types'
 
 /**
@@ -277,6 +278,75 @@ function detectarAparelho(): string {
 }
 
 /* ------------------------- administração (cadastros) ----------------------- */
+
+/**
+ * Ajustes das fichas publicados no servidor.
+ *
+ * O ajuste define limite de medição, itens e nomes. Até aqui ele só existia no
+ * aparelho de quem editava, então o limite revisado pelo administrador não
+ * chegava em ninguém. Ficou pior do que "não sincronizar": cada técnico media
+ * por uma régua diferente e o app não avisava.
+ */
+export async function baixarAjustesDeFichas(
+  endpoint: string,
+): Promise<{ ok: boolean; dados?: AjustesPublicados; erro?: string }> {
+  if (!lerToken()) return { ok: false, erro: 'sem sessão' }
+  try {
+    const r = await fetch(`${endpoint.replace(/\/$/, '')}/fichas-ajustes`, {
+      headers: cabecalhos(),
+    })
+    if (r.status === 401 || r.status === 403) return { ok: false, erro: 'sem permissão' }
+    if (!r.ok) return { ok: false, erro: `HTTP ${r.status}` }
+    const dados = (await r.json()) as AjustesPublicados
+    return {
+      ok: true,
+      dados: {
+        ajustes:
+          dados.ajustes && typeof dados.ajustes === 'object' && !Array.isArray(dados.ajustes)
+            ? dados.ajustes
+            : {},
+        atualizadoEm: dados.atualizadoEm ?? null,
+        atualizadoPor: dados.atualizadoPor ?? null,
+      },
+    }
+  } catch (e) {
+    return { ok: false, erro: (e as Error).message }
+  }
+}
+
+/**
+ * Publica os ajustes para a equipe. O servidor só aceita de administrador.
+ *
+ * Devolve o carimbo gravado lá para o aparelho autor saber que já está na
+ * versão em vigor — sem isso ele baixaria a própria alteração na próxima
+ * abertura e reescreveria o banco local sem motivo.
+ */
+export async function publicarAjustesDeFichas(
+  endpoint: string,
+  ajustes: FichasAjustadas,
+): Promise<{ ok: boolean; atualizadoEm?: string; autor?: string | null; erro?: string }> {
+  if (!lerToken()) return { ok: false, erro: 'sem sessão' }
+  try {
+    const r = await fetch(`${endpoint.replace(/\/$/, '')}/fichas-ajustes`, {
+      method: 'PUT',
+      headers: cabecalhos({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ ajustes }),
+    })
+    if (r.status === 403) return { ok: false, erro: 'só o administrador publica a ficha' }
+    if (!r.ok) return { ok: false, erro: `HTTP ${r.status}` }
+    const dados = (await r.json()) as { atualizadoEm?: string; autor?: string | null }
+    return { ok: true, atualizadoEm: dados.atualizadoEm, autor: dados.autor ?? null }
+  } catch (e) {
+    return { ok: false, erro: (e as Error).message }
+  }
+}
+
+/** Retrato do que o servidor tem publicado. */
+export interface AjustesPublicados {
+  ajustes: FichasAjustadas
+  atualizadoEm: string | null
+  atualizadoPor?: string | null
+}
 
 /**
  * Cadastros e exclusão de execução só passam pelo serviço de administração, com

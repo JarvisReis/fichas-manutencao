@@ -256,3 +256,27 @@ create table if not exists public.pessoas (
 create unique index if not exists pessoas_rg_unico on public.pessoas (upper(rg));
 
 alter table public.pessoas enable row level security;
+
+-- ---------------------------------------------------------------------------
+-- CONFIGURAÇÕES DO SISTEMA (ajustes das fichas)
+--
+-- A ficha em campo é `padrão do código + ajuste`. O ajuste nascia no IndexedDB
+-- de quem editava: o administrador revisava um limite de medição e os técnicos
+-- continuavam medindo com o limite velho, sem aviso nenhum — a pior divergência
+-- possível numa ficha de conformidade.
+--
+-- Chave-valor para não criar uma tabela por ajuste futuro (núcleo padrão,
+-- texto de cabeçalho, etc.). Hoje só a chave 'fichas-ajustes' é usada.
+--
+-- RLS ligada e SEM policy de propósito: nem `anon` nem `authenticated` leem
+-- isto direto. Quem lê e grava é o servidor de sync (service role), que aplica
+-- a regra "só administrador publica".
+-- ---------------------------------------------------------------------------
+create table if not exists public.configuracoes (
+  chave         text primary key,
+  valor         jsonb not null,
+  atualizado_em timestamptz not null default now(),
+  atualizado_por uuid
+);
+
+alter table public.configuracoes enable row level security;

@@ -70,3 +70,50 @@ export function fichasEmVigor(ajustes: FichasAjustadas): DefinicaoFicha[] {
 
 /** Marcas que o código conhece, para validar o ajuste que vem de fora. */
 export const TIPOS_ITEM_VALIDOS = ['texto', 'numero', 'lista'] as const
+
+/**
+ * Controle da versão publicada no servidor.
+ *
+ * `cadastro:fichasEm` guarda o carimbo da última versão que este aparelho
+ * aplicou; `cadastro:fichasPendente` existe quando o administrador salvou sem
+ * rede e a publicação ainda não aconteceu. Separar os dois evita o pior caso:
+ * baixar por cima de uma alteração local que nunca subiu.
+ */
+const CHAVE_REMOTO = 'cadastro:fichasEm'
+const CHAVE_PENDENTE = 'cadastro:fichasPendente'
+
+export async function lerVersaoAplicada(): Promise<string | null> {
+  const registro = await db.config.get(CHAVE_REMOTO)
+  return registro?.valor || null
+}
+
+export const gravarVersaoAplicada = (carimbo: string) =>
+  db.config.put({ chave: CHAVE_REMOTO, valor: carimbo })
+
+export async function lerPublicacaoPendente(): Promise<boolean> {
+  const registro = await db.config.get(CHAVE_PENDENTE)
+  return registro?.valor === '1'
+}
+
+export const marcarPublicacaoPendente = (pendente: boolean) =>
+  db.config.put({ chave: CHAVE_PENDENTE, valor: pendente ? '1' : '0' })
+
+/**
+ * Vale baixar o que está no servidor?
+ *
+ * Só quando o carimbo remoto é mais novo que o aplicado e o carimbo é uma data
+ * válida — servidor sem ajuste nenhum devolve `null`, e aí não há o que baixar
+ * (nem motivo para apagar o ajuste que já existe aqui).
+ */
+export function deveAplicarRemoto(
+  versaoAplicada: string | null,
+  atualizadoEm: string | null | undefined,
+): boolean {
+  if (!atualizadoEm) return false
+  const remoto = Date.parse(atualizadoEm)
+  if (Number.isNaN(remoto)) return false
+  if (!versaoAplicada) return true
+  const local = Date.parse(versaoAplicada)
+  if (Number.isNaN(local)) return true
+  return remoto > local
+}
