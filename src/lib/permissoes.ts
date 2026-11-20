@@ -120,6 +120,30 @@ export function podeApagarRascunho(
 }
 
 /**
+ * Quais números de série de núcleo ainda faltam.
+ *
+ * Existe separado do componente por um motivo concreto: a conferência lia os
+ * núcleos de `camposFixos`, mas o seletor de núcleo grava em estado próprio e
+ * só junta tudo ao sair da tela. Resultado em campo — o técnico escolhia o
+ * núcleo retirado, apertava Próximo e o app acusava "falta o número de série do
+ * núcleo retirado" com o campo preenchido na frente dele, sem deixar avançar
+ * para as medições.
+ *
+ * Regra: núcleo instalado é sempre obrigatório; retirado só na P2, onde ele é o
+ * registro da peça que saiu do contator.
+ */
+export function nucleosEmBranco(
+  ehP2: boolean,
+  instalado: string | undefined,
+  retirado: string | undefined,
+): string[] {
+  const faltando: string[] = []
+  if (!(instalado ?? '').trim()) faltando.push('Nº Série do Núcleo — Instalado')
+  if (ehP2 && !(retirado ?? '').trim()) faltando.push('Nº Série do Núcleo — Retirado')
+  return faltando
+}
+
+/**
  * Identificação completa: pode sair da tela de identificação para as medições.
  *
  * A ficha é preenchida em dupla e todo registro precisa dizer QUEM mediu, ONDE

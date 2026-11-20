@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { podeApagarRascunho, rascunhoExpirado, validadeDoRascunho, VALIDADE_RASCUNHO_MS } from './permissoes'
+import { nucleosEmBranco, podeApagarRascunho, rascunhoExpirado, validadeDoRascunho, VALIDADE_RASCUNHO_MS } from './permissoes'
 
 const DIA = 86_400_000
 const agora = Date.parse('2026-11-17T12:00:00.000Z')
@@ -84,5 +84,35 @@ describe('podeApagarRascunho', () => {
   it('usuário não apaga ficha fechada, mesmo sendo o autor', () => {
     expect(podeApagarRascunho({ status: 'concluida', criadaPor: 'u-tec' }, tecnico)).toBe(false)
     expect(podeApagarRascunho({ status: 'pendente', criadaPor: 'u-tec' }, tecnico)).toBe(false)
+  })
+})
+
+/**
+ * Conferência dos números de série de núcleo.
+ *
+ * O defeito que estes testes prendem: o app acusava falta do núcleo retirado
+ * com o seletor preenchido, e o técnico não conseguia sair da aba para medir.
+ * A causa era ler o valor de `camposFixos`, onde ele só entra depois de sair da
+ * tela — aqui a regra recebe o estado de verdade.
+ */
+describe('nucleosEmBranco', () => {
+  it('P2 com os dois núcleos preenchidos não tem pendência', () => {
+    expect(nucleosEmBranco(true, 'HPB007', 'HPB003')).toEqual([])
+  })
+
+  it('P2 sem o retirado acusa só o retirado', () => {
+    expect(nucleosEmBranco(true, 'HPB007', '')).toEqual(['Nº Série do Núcleo — Retirado'])
+  })
+
+  it('P1 ignora o retirado, mesmo vazio', () => {
+    expect(nucleosEmBranco(false, 'HPB007', '')).toEqual([])
+  })
+
+  it('instalado é sempre obrigatório', () => {
+    expect(nucleosEmBranco(false, '  ', 'HPB003')).toEqual(['Nº Série do Núcleo — Instalado'])
+    expect(nucleosEmBranco(true, '', '')).toEqual([
+      'Nº Série do Núcleo — Instalado',
+      'Nº Série do Núcleo — Retirado',
+    ])
   })
 })

@@ -9,7 +9,7 @@ import {
   salvarCamposFixos,
 } from '../lib/db'
 import { lerNucleoDoServidor } from '../lib/sync'
-import { identificacaoCompleta } from '../lib/permissoes'
+import { identificacaoCompleta, nucleosEmBranco } from '../lib/permissoes'
 import {
   lerEquipamentos,
   lerPessoas,
@@ -329,13 +329,15 @@ export default function TelaIdentificacao({
        */
       // Núcleo retirado só existe na P2.
       if (campo.id === 'serieRetirado' && !ehP2) continue
-      // Núcleo instalado é lido do próprio estado, não de camposFixos.
-      if (campo.id === 'serieInstalado') continue
+      // Núcleos são lidos do próprio estado, não de camposFixos: o seletor de núcleo
+      // grava em `nucleoInstalado`/`nucleoRetirado` e só junta tudo em
+      // `camposFixos` na hora de sair da tela. Ler daqui dava falso "em branco"
+      // com o campo preenchido na cara do técnico, que ficava preso na aba.
+      if (campo.id === 'serieInstalado' || campo.id === 'serieRetirado') continue
       if (!(camposFixos[campo.id] ?? '').trim()) lista.push(campo.nome)
     }
-    // Núcleo instalado é obrigatório: na P1 ele vem do cadastro, ou, quando não
-    // há registro (primeira ficha), é informado aqui.
-    if (!nucleoInstalado.trim()) lista.push('Nº Série do Núcleo — Instalado')
+    // Núcleos: instalado sempre obrigatório, retirado só na P2.
+    lista.push(...nucleosEmBranco(ehP2, nucleoInstalado, nucleoRetirado))
     if (!local.trim()) lista.push('Local')
     if (equipe.length === 0) lista.push('Equipe')
     return lista
