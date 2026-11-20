@@ -20,14 +20,49 @@ export interface Pessoa {
   id: string
   nome: string
   rg: string
+  /**
+   * E-mail de acesso ao app. Obrigatório para quem for usar o sistema: é por
+   * ele que o Supabase identifica a pessoa no login e no convite.
+   */
+  email?: string
   /** cargo/função na equipe, ex.: "Eletricista de manutenção" */
   funcao?: string
   /** administrador pode manter cadastros; usuário apenas executa */
   nivel: NivelAcesso
   ativo: boolean
+  /**
+   * Preenchido quando o convite foi enviado: é o id da conta criada no
+   * Supabase. O perfil no banco só nasce quando a pessoa abre o link e cria a
+   * senha — antes disso o cadastro existe apenas no aparelho do administrador.
+   */
+  userId?: string
+  /** e-mail foi convidado e o perfil entra no banco no aceite */
+  convitePendente?: boolean
 }
 
 const CHAVE_EQUIP = 'cadastro:equipamentos'
+
+/**
+ * Nem todo mundo da equipe usa o app.
+ *
+ * "Equipe" é quem aparece na ficha (RG 1, RG 2) — basta nome e RG. "Acesso" é
+ * quem entra no app, e isso exige e-mail, convite e senha. Misturar as duas
+ * coisas obrigava a criar conta para quem só assina a ficha, e escondia na
+ * lista quem ainda não tinha aceitado o convite.
+ */
+export type SituacaoAcesso = 'sem-acesso' | 'convite-pendente' | 'ativo' | 'inativo'
+
+export function situacaoAcesso(p: Pessoa): SituacaoAcesso {
+  if (!p.ativo) return 'inativo'
+  if (p.userId) return 'ativo'
+  if (p.email || p.convitePendente) return 'convite-pendente'
+  return 'sem-acesso'
+}
+
+/** A pessoa consegue entrar no app hoje. */
+export function temAcesso(p: Pessoa): boolean {
+  return situacaoAcesso(p) === 'ativo'
+}
 const CHAVE_PESSOAS = 'cadastro:pessoas'
 
 /** Cadastros iniciais — servem de ponto de partida e podem ser editados no app. */
@@ -53,7 +88,44 @@ async function gravarLista<T>(chave: string, lista: T[]) {
 }
 
 export const lerEquipamentos = () => lerLista<Equipamento>(CHAVE_EQUIP, EQUIPAMENTOS_INICIAIS)
-export const gravarEquipamentos = (lista: Equipamento[]) => gravarLista(CHAVE_EQUIP, lista)
+
+/**
+ * Chave de identidade do equipamento na lista.
+ *
+ * O `id` é a identidade de verdade, mas duas linhas criadas pelo servidor em
+ * momentos diferentes ganharam ids diferentes para o MESMO contator — foi
+ * assim que o CLI-CT01 ficou duplicado. Por isso a identidade que vale é o
+ * nome, e o `id` só desempata. Sem isso a lista aceita dois cartões iguais: a
+ * home mostra os dois e o técnico abre a ficha errada.
+ */
+export function chaveDoEquipamento(e: Equipamento): string {
+  return normalizar(e.nome ?? '').trim()
+}
+
+/**
+ * Remove equipamentos repetidos, mantendo o ÚLTIMO de cada nome.
+ *
+ * A ordem importa: o último é o mais recente, que é o cadastro que o
+ * administrador acabou de salvar. Manter o primeiro deixaria a versão velha na
+ * tela depois de uma correção.
+ */
+export function semEquipamentosRepetidos(lista: Equipamento[]): Equipamento[] {
+  const porNome = new Map<string, Equipamento>()
+  const semNome: Equipamento[] = []
+  for (const equip of lista) {
+    const chave = chaveDoEquipamento(equip)
+    if (!chave) {
+      // Sem nome não há como identificar: fica, e o cadastro pede o nome.
+      semNome.push(equip)
+      continue
+    }
+    porNome.set(chave, equip)
+  }
+  return [...porNome.values(), ...semNome]
+}
+
+export const gravarEquipamentos = (lista: Equipamento[]) =>
+  gravarLista(CHAVE_EQUIP, semEquipamentosRepetidos(lista))
 
 export const lerPessoas = () => lerLista<Pessoa>(CHAVE_PESSOAS, PESSOAS_INICIAIS)
 export const gravarPessoas = (lista: Pessoa[]) => gravarLista(CHAVE_PESSOAS, lista)
@@ -102,8 +174,8 @@ export function novoId(): string {
 /* --------------------------- cadastros no servidor -------------------------- */
 
 /**
- * Fonte da verdade dos cadastros é o servidor (`admin-server.mjs` → lista
- * ConfigFichas). O aparelho guarda uma cópia local com a versão recebida:
+ * Fonte da verdade dos cadastros é o servidor (Supabase; o app lê pelo
+ * `sync-server`). O aparelho guarda uma cópia local com a versão recebida:
  * o app nunca deixa uma cópia mais velha sobrescrever uma mais nova.
  */
 const CHAVE_VERSAO = 'cadastro:versao'
@@ -141,7 +213,7 @@ export async function aplicarCadastrosDoServidor(dados: {
  * depois descartado em silêncio na hora de montar a equipe — a pessoa
  * aparecia na lista, o toque não marcava, e nada explicava o motivo.
  *
- * Regra do Metrô: identificação interna, sempre com o prefixo **R** e mais
+ * Identificação interna, sempre com o prefixo **R** e mais
  * 5 ou 6 dígitos — `R221221`, `R22104`. Não é documento oficial (RG civil):
  * é o registro funcional da própria empresa, e por isso o formato é fixo.
  *
@@ -232,4 +304,14 @@ export function rgEmUso(
       (p) => p.id !== idAtual && rgValido(p.rg) && normalizarRg(p.rg) === alvo,
     ) ?? null
   )
+}
+
+/**
+ * E-mail de acesso. Regra deliberadamente frouxa — o objetivo é pegar o erro de
+ * digitação (espaço, falta de @, domínio sem ponto), não validar RFC. Quem diz
+ * se o endereço existe é o envio do convite.
+ */
+export function emailValido(email: string | undefined | null): boolean {
+  const limpo = (email ?? '').trim()
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(limpo)
 }

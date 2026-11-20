@@ -17,14 +17,40 @@ export const MARCA_CONTATOR: Marca = 'secheron'
 const CHAVE_ANTIGA = 'schneider'
 
 /**
+ * Erros de digitação já vistos no cadastro de equipamentos (`Scheron` sem o
+ * "e"). São lidos como Sechéron para não mudar o limite do ensaio.
+ */
+const VARIANTES_SECHERON = new Set(['scheron', 'secheronn', 'secheron'])
+
+/**
+ * Reduz a marca a letras minúsculas sem acento, para comparar.
+ * O banco e planilhas já gravaram `Secheron`, `SECHERON` e `Sechéron`; se a
+ * comparação fosse exata, todos cairiam em `undefined` e o item perderia o
+ * limite próprio (15 µΩ) em silêncio, voltando ao padrão de 30 µΩ.
+ */
+function chaveDaMarca(bruta: string): string {
+  return bruta
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+}
+
+/**
  * Converte a marca lida do banco/servidor para a chave atual.
  * Sem isso, execução antiga com `schneider` passaria a ser tratada como
  * "marca que não existe" e perderia o limite próprio.
+ *
+ * Aceita qualquer caixa e acentuação. Variantes conhecidas de digitação da
+ * Sechéron (`scheron`, `secheronn`) também são aceitas: errar uma letra no
+ * cadastro não pode mudar o limite do ensaio.
  */
 export function normalizarMarca(bruta?: string | null): Marca | undefined {
   if (!bruta) return undefined
-  if (bruta === CHAVE_ANTIGA) return MARCA_CONTATOR
-  if (bruta === 'merlin' || bruta === MARCA_CONTATOR) return bruta
+  const chave = chaveDaMarca(bruta)
+  if (chave === CHAVE_ANTIGA) return MARCA_CONTATOR
+  if (chave === 'merlin') return 'merlin'
+  if (chave === MARCA_CONTATOR || VARIANTES_SECHERON.has(chave)) return MARCA_CONTATOR
   return undefined
 }
 
@@ -96,7 +122,6 @@ export interface ValorItem {
   /** string crua digitada ("∞" é válido) */
   valor: string
   observacao?: string
-  fotoId?: string
 }
 
 export interface Execucao {
@@ -133,12 +158,4 @@ export interface Execucao {
   sincronizada: boolean
   criadaEm: string
   atualizadaEm: string
-}
-
-export interface Foto {
-  id: string
-  execucaoId: string
-  itemId: string
-  blob: Blob
-  criadaEm: string
 }

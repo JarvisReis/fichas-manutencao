@@ -1,9 +1,7 @@
 import { useState } from 'react'
-import { LogIn, LogOut, Lock, ShieldCheck, User as UserIcon } from 'lucide-react'
-import { lerPessoas } from '../lib/cadastros'
+import { Eye, EyeOff, LogIn, LogOut, Lock, ShieldCheck, User as UserIcon } from 'lucide-react'
 import type { Sessao } from '../lib/sessao'
-import { useEffect } from 'react'
-import type { Pessoa } from '../lib/cadastros'
+import { entrarComSenha, sairConta, supabaseConfigurado } from '../lib/auth'
 
 interface Props {
   sessao: Sessao | null
@@ -19,9 +17,15 @@ interface Props {
 }
 
 /**
- * Identificação de quem está executando. O RG é a credencial de campo: escolhe a
- * pessoa ativa cadastrada. Administrador mantém cadastros e apaga execuções;
- * usuário só executa. A sessão vale no aparelho até alguém sair.
+ * Identificação de quem está executando.
+ *
+ * Agora é e-mail e senha, conferidos pelo Supabase — a credencial de campo
+ * deixou de ser o RG. O RG continua sendo o que aparece na ficha e no
+ * histórico, mas ele não prova identidade: qualquer um digitaria R221221.
+ * A senha, sim.
+ *
+ * O nível (administrador/usuário) vem de `perfis`, não da tela. Quem não tem
+ * perfil ativo não entra.
  */
 export default function SeletorSessao({
   sessao,
@@ -30,40 +34,62 @@ export default function SeletorSessao({
   onSair,
   compacto = false,
 }: Props) {
-  // entrar/tentar ficam antes do primeiro return porque o modo compacto
-  // (cabeçalho) também usa os dois.
-  const entrar = (pessoa: Pessoa) => {
-    onEntrar({
-      pessoaId: pessoa.id,
-      nome: pessoa.nome,
-      rg: pessoa.rg,
-      nivel: pessoa.nivel,
-    })
-    setAberto(false)
-    setRg('')
-    setErro(null)
-  }
+  const [aberto, setAberto] = useState(false)
+  const [email, setEmail] = useState('')
+  const [senha, setSenha] = useState('')
+  const [verSenha, setVerSenha] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
+  const [ocupado, setOcupado] = useState(false)
 
-  const tentar = () => {
-    const termo = rg.trim()
-    if (!termo) return
-    const achado = pessoas.find((p) => p.rg.trim() === termo)
-    if (!achado) {
-      setErro('RG não encontrado entre os funcionários ativos.')
+  const configurado = supabaseConfigurado()
+
+  /**
+   * Entra de verdade: o Supabase confere a senha e devolve o token; o perfil
+   * (nome, RG, nível) vem da tabela `perfis`. Só então a sessão local nasce.
+   *
+   * Sem perfil a pessoa não passa — ter conta no Auth não é o mesmo que fazer
+   * parte do time. É o administrador que cria o perfil.
+   */
+  const tentar = async () => {
+    setErro(null)
+    if (!email.trim() || !senha) {
+      setErro('Preencha e-mail e senha.')
       return
     }
-    entrar(achado)
+    setOcupado(true)
+    try {
+      const login = await entrarComSenha(email.trim(), senha)
+      if (!login.ok) {
+        setErro(login.erro ?? 'Não foi possível entrar.')
+        return
+      }
+      // `entrarComSenha` já devolveu o perfil conferido: reler aqui só abriria
+      // espaço para a sessão antiga responder no lugar do login novo.
+      const perfil = login.perfil
+      if (!perfil) {
+        await sairConta()
+        setErro('Este e-mail não tem perfil no sistema. Fale com o administrador.')
+        return
+      }
+      onEntrar({
+        pessoaId: login.id ?? '',
+        nome: perfil.nome,
+        rg: perfil.rg,
+        nivel: perfil.nivel,
+      })
+      setAberto(false)
+      setEmail('')
+      setSenha('')
+    } finally {
+      setOcupado(false)
+    }
   }
 
-  const [pessoas, setPessoas] = useState<Pessoa[]>([])
-  const [aberto, setAberto] = useState(false)
-  const [rg, setRg] = useState('')
-  const [erro, setErro] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!aberto) return
-    void lerPessoas().then((lista) => setPessoas(lista.filter((p) => p.ativo)))
-  }, [aberto])
+  /** Sair encerra a sessão local E a do Supabase, senão o token fica válido. */
+  const sair = () => {
+    void sairConta()
+    onSair()
+  }
 
   if (sessao) {
     if (compacto) {
@@ -103,7 +129,7 @@ export default function SeletorSessao({
           </p>
         </div>
         <button
-          onClick={onSair}
+          onClick={sair}
           className="shrink-0 rounded-lg border border-slate-300 px-2 py-1.5 text-[11px] font-semibold text-slate-700 active:bg-slate-100"
         >
           <span className="flex items-center gap-1">
@@ -129,26 +155,48 @@ export default function SeletorSessao({
     }
     return (
       <div className="flex-1 space-y-2 rounded-xl bg-white/15 p-2">
+        <input
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value)
+            setErro(null)
+          }}
+          placeholder="e-mail"
+          type="email"
+          inputMode="email"
+          autoCapitalize="none"
+          autoCorrect="off"
+          autoFocus
+          className="w-full rounded-lg px-2 py-1.5 text-sm text-slate-900 outline-none"
+        />
         <div className="flex gap-1.5">
           <input
-            value={rg}
+            value={senha}
             onChange={(e) => {
-              setRg(e.target.value)
+              setSenha(e.target.value)
               setErro(null)
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') tentar()
+              if (e.key === 'Enter') void tentar()
             }}
-            placeholder="RG"
-            inputMode="numeric"
-            autoFocus
+            placeholder="senha"
+            type={verSenha ? 'text' : 'password'}
             className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-sm text-slate-900 outline-none"
           />
           <button
-            onClick={tentar}
-            className="shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-[11px] font-semibold text-blue-800"
+            type="button"
+            onClick={() => setVerSenha((v) => !v)}
+            className="shrink-0 rounded-lg bg-white/20 px-2 text-white"
+            aria-label={verSenha ? 'Ocultar senha' : 'Mostrar senha'}
           >
-            Entrar
+            {verSenha ? <EyeOff size={14} /> : <Eye size={14} />}
+          </button>
+          <button
+            onClick={() => void tentar()}
+            disabled={ocupado}
+            className="shrink-0 rounded-lg bg-white px-2.5 py-1.5 text-[11px] font-semibold text-blue-800 disabled:opacity-60"
+          >
+            {ocupado ? '…' : 'Entrar'}
           </button>
         </div>
         {erro && <p className="text-[10px] font-medium text-amber-100">{erro}</p>}
@@ -174,49 +222,67 @@ export default function SeletorSessao({
         </button>
       ) : (
         <div className="mt-2 space-y-2">
+          <input
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value)
+              setErro(null)
+            }}
+            placeholder="e-mail"
+            type="email"
+            inputMode="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            autoFocus
+            className="w-full rounded-lg border-2 border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-600"
+          />
+
           <div className="flex gap-2">
             <input
-              value={rg}
+              value={senha}
               onChange={(e) => {
-                setRg(e.target.value)
+                setSenha(e.target.value)
                 setErro(null)
               }}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') tentar()
+                if (e.key === 'Enter') void tentar()
               }}
-              placeholder="RG"
-              inputMode="numeric"
+              placeholder="senha"
+              type={verSenha ? 'text' : 'password'}
               className="min-w-0 flex-1 rounded-lg border-2 border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-600"
             />
             <button
-              onClick={tentar}
-              className="shrink-0 rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white"
+              type="button"
+              onClick={() => setVerSenha((v) => !v)}
+              className="shrink-0 rounded-lg border-2 border-slate-300 bg-white px-2.5 text-slate-600"
+              aria-label={verSenha ? 'Ocultar senha' : 'Mostrar senha'}
             >
-              Entrar
+              {verSenha ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
 
-          {erro && <p className="text-[11px] font-medium text-red-700">{erro}</p>}
+          <button
+            onClick={() => void tentar()}
+            disabled={ocupado}
+            className="w-full rounded-lg bg-blue-700 py-2.5 text-xs font-semibold text-white disabled:bg-slate-300"
+          >
+            {ocupado ? 'Entrando…' : 'Entrar'}
+          </button>
 
-          {pessoas.length > 0 && (
-            <div className="max-h-40 overflow-y-auto rounded-lg border border-slate-200 bg-white">
-              {pessoas.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => entrar(p)}
-                  className="flex w-full items-center gap-2 border-b border-slate-100 px-2.5 py-2 text-left last:border-0 active:bg-blue-50"
-                >
-                  <span className="min-w-0 flex-1 truncate text-xs text-slate-800">{p.nome}</span>
-                  <span className="shrink-0 text-[10px] text-slate-500">RG {p.rg}</span>
-                </button>
-              ))}
-            </div>
+          {!configurado && (
+            <p className="rounded-lg bg-amber-100 p-2 text-[10px] leading-snug text-amber-900">
+              Este app foi gerado sem o endereço do servidor. Entre em contato com o
+              administrador.
+            </p>
           )}
+
+          {erro && <p className="text-[11px] font-medium text-red-700">{erro}</p>}
 
           <button
             onClick={() => {
               setAberto(false)
               setErro(null)
+              setSenha('')
             }}
             className="w-full rounded-lg border border-slate-300 bg-white py-1.5 text-[11px] font-semibold text-slate-600"
           >

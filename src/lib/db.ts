@@ -1,15 +1,14 @@
 import Dexie, { type Table } from 'dexie'
-import { MARCA_CONTATOR, type Execucao, type Foto } from '../types'
+import { MARCA_CONTATOR, type Execucao } from '../types'
 import { rascunhoExpirado } from './permissoes'
 import { rgPareceOrgao } from './cadastros'
 
 /**
  * Banco local do app. Tudo é gravado aqui primeiro — a sincronização com o
- * SharePoint é uma etapa separada que só roda quando há rede.
+ * O envio ao servidor é uma etapa separada que só roda quando há rede.
  */
 export class FichasDB extends Dexie {
   execucoes!: Table<Execucao, string>
-  fotos!: Table<Foto, string>
   config!: Table<{ chave: string; valor: string }, string>
 
   constructor() {
@@ -18,7 +17,6 @@ export class FichasDB extends Dexie {
     super('fichas-metro')
     this.version(1).stores({
       execucoes: 'id, codigo, fichaId, status, sincronizada, criadaEm, dataHora, atualizadaEm',
-      fotos: 'id, execucaoId',
       config: 'chave',
     })
   }
@@ -175,32 +173,10 @@ function intervalo(inicio: Date, fim: Date): string {
   return `${inicio.toLocaleDateString('pt-BR')}–${fim.toLocaleDateString('pt-BR')}`
 }
 
-/** Comprime a foto no cliente antes de guardar (alvo < 300 KB). */
-export async function comprimirImagem(arquivo: File, maxLargura = 1600): Promise<Blob> {
-  const bitmap = await createImageBitmap(arquivo)
-  const escala = Math.min(1, maxLargura / bitmap.width)
-  const largura = Math.round(bitmap.width * escala)
-  const altura = Math.round(bitmap.height * escala)
-
-  const canvas = document.createElement('canvas')
-  canvas.width = largura
-  canvas.height = altura
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('Canvas indisponível')
-  ctx.drawImage(bitmap, 0, 0, largura, altura)
-  bitmap.close?.()
-
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.75),
-  )
-  if (!blob) throw new Error('Falha ao comprimir a imagem')
-  return blob
-}
-
 /* ------------------------- limpeza de rascunhos ---------------------------- */
 
 /**
- * Apaga os rascunhos vencidos, junto com as fotos deles.
+ * Apaga os rascunhos vencidos.
  *
  * Roda na abertura do app, antes de qualquer tela: assim a seção "Continuar"
  * da home nunca mostra trabalho que já venceu. Devolve quantos foram apagados
@@ -217,8 +193,6 @@ export async function limparRascunhosVencidos(agora: number = Date.now()) {
   })
 
   for (const id of vencidos) {
-    const fotos = await db.fotos.where('execucaoId').equals(id).toArray()
-    for (const f of fotos) await db.fotos.delete(f.id)
     await db.execucoes.delete(id)
   }
 

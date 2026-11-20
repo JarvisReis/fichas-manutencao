@@ -1,6 +1,13 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Pencil, Plus, Trash2, Users, Wrench, X } from 'lucide-react'
-import { FICHAS, getFicha } from '../config/fichas'
+import { ArrowLeft, ClipboardList, Mail, Pencil, Plus, Trash2, Users, Wrench, X } from 'lucide-react'
+import { FICHAS, definirFichasEmVigor, getFicha } from '../config/fichas'
+import EditorFichas from './EditorFichas'
+import {
+  fichasEmVigor,
+  gravarFichasAjustadas,
+  lerFichasAjustadas,
+  type FichasAjustadas,
+} from '../lib/fichasEditadas'
 import {
   gravarEquipamentos,
   gravarPessoas,
@@ -9,6 +16,7 @@ import {
   novoId,
   rgEmUso,
   rgValido,
+  situacaoAcesso,
   type Equipamento,
   type NivelAcesso,
   type Pessoa,
@@ -16,27 +24,33 @@ import {
 import { ShieldCheck, User as UserIcon, CloudUpload, CloudOff } from 'lucide-react'
 import { db, fichaZerada } from '../lib/db'
 import { enviarEquipamentos, enviarPessoas } from '../lib/sync'
+import { convidarTecnico, reenviarConvite } from '../lib/auth'
+import { emailValido } from '../lib/cadastros'
 import { gravarVersao } from '../lib/cadastros'
 import { obterEndpointAdmin } from '../lib/sync'
+
+type Aba = 'equipamentos' | 'equipe' | 'fichas'
 
 interface Props {
   onVoltar: () => void
   /** nome de quem está logado como administrador (mostrado no cabeçalho) */
   administrador?: string
+  /** abre direto numa seção (o atalho "Editar ficha" cai no editor de fichas) */
+  abaInicial?: Aba
 }
 
-type Aba = 'equipamentos' | 'equipe'
-
-export default function TelaCadastros({ onVoltar, administrador }: Props) {
-  const [aba, setAba] = useState<Aba>('equipe')
+export default function TelaCadastros({ onVoltar, administrador, abaInicial }: Props) {
+  const [aba, setAba] = useState<Aba>(abaInicial ?? 'equipe')
   const [equipamentos, setEquipamentos] = useState<Equipamento[]>([])
   const [pessoas, setPessoas] = useState<Pessoa[]>([])
+  const [ajustesFichas, setAjustesFichas] = useState<FichasAjustadas>({})
   const [carregado, setCarregado] = useState(false)
 
   useEffect(() => {
     void (async () => {
       setEquipamentos(await lerEquipamentos())
       setPessoas(await lerPessoas())
+      setAjustesFichas(await lerFichasAjustadas())
       setCarregado(true)
     })()
   }, [])
@@ -103,6 +117,26 @@ export default function TelaCadastros({ onVoltar, administrador }: Props) {
     )
   }
 
+  /**
+   * Ajuste de ficha não vai para o servidor.
+   *
+   * O servidor hoje replica equipamentos e equipe; publicar definição de ficha
+   * exigiria tabela e rota novas. Enquanto isso não existe, o ajuste vale no
+   * aparelho do administrador — e o aviso deixa claro que não é compartilhado,
+   * em vez de fingir que foi.
+   */
+  const salvarFichas = async (ajustes: FichasAjustadas) => {
+    setAjustesFichas(ajustes)
+    await gravarFichasAjustadas(ajustes)
+    // A ficha em vigor muda na hora: sem isso a tela de execução continuaria
+    // com a definição antiga até recarregar.
+    definirFichasEmVigor(fichasEmVigor(ajustes))
+    setAvisoEnvio({
+      erro: true,
+      texto: 'Ficha salva neste aparelho. Ainda não é compartilhada com a equipe.',
+    })
+  }
+
   if (!carregado) {
     return (
       <div className="flex min-h-screen items-center justify-center text-sm text-slate-500">
@@ -147,6 +181,14 @@ export default function TelaCadastros({ onVoltar, administrador }: Props) {
           >
             <Wrench size={15} /> Equipamentos ({equipamentos.length})
           </button>
+          <button
+            onClick={() => setAba('fichas')}
+            className={`col-span-2 flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold transition ${
+              aba === 'fichas' ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-700'
+            }`}
+          >
+            <ClipboardList size={15} /> Fichas de medição
+          </button>
         </div>
       </header>
 
@@ -172,8 +214,10 @@ export default function TelaCadastros({ onVoltar, administrador }: Props) {
         )}
         {aba === 'equipe' ? (
           <EditorPessoas pessoas={pessoas} onSalvar={salvarPessoas} />
-        ) : (
+        ) : aba === 'equipamentos' ? (
           <EditorEquipamentos equipamentos={equipamentos} onSalvar={salvarEquipamentos} />
+        ) : (
+          <EditorFichas ajustes={ajustesFichas} onSalvar={salvarFichas} />
         )}
       </div>
     </div>
@@ -213,13 +257,41 @@ function EditorPessoas({
     return a.nome.localeCompare(b.nome, 'pt-BR')
   })
 
+  /** Quantos dependem de ação do administrador para entrar no app. */
+  const pendentesAcesso = pessoas.filter((p) => situacaoAcesso(p) === 'convite-pendente').length
+  const semAcesso = pessoas.filter((p) => situacaoAcesso(p) === 'sem-acesso').length
+
   return (
     <div className="space-y-3">
       <p className="rounded-xl bg-blue-50 p-3 text-xs leading-relaxed text-blue-900">
         Nome, RG e status. Somente funcionários <strong>ativos</strong> aparecem na seleção da
         equipe durante a execução — quem sai de férias ou é transferido pode ser desativado sem
         perder o histórico.
+        <span className="mt-1 block">
+          <strong>Equipe</strong> e <strong>acesso ao app</strong> são separados: dá para estar na
+          ficha sem ter conta. Só quem tem e-mail e aceitou o convite entra no app.
+        </span>
       </p>
+
+      {(pendentesAcesso > 0 || semAcesso > 0) && (
+        <p className="rounded-xl bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">
+          {pendentesAcesso > 0 && (
+            <>
+              <strong>{pendentesAcesso}</strong>{' '}
+              {pendentesAcesso === 1 ? 'pessoa tem' : 'pessoas têm'} convite pendente —{' '}
+              {pendentesAcesso === 1 ? 'ela ainda não' : 'elas ainda não'} criou a senha.
+              Reenvie tocando em ✏️.
+            </>
+          )}
+          {pendentesAcesso > 0 && semAcesso > 0 && ' '}
+          {semAcesso > 0 && (
+            <>
+              <strong>{semAcesso}</strong> {semAcesso === 1 ? 'pessoa é' : 'pessoas são'} só
+              equipe, sem acesso ao app.
+            </>
+          )}
+        </p>
+      )}
 
       {editando && (
         <FormularioPessoa
@@ -281,6 +353,13 @@ function EditorPessoas({
                   )}
                   {pessoa.nivel === 'administrador' ? 'ADMINISTRADOR' : 'USUÁRIO'}
                 </p>
+                {/*
+                  Equipe e acesso são coisas diferentes: quem não tem e-mail
+                  entra nas fichas mas não abre o app. Sem este selo o
+                  administrador convidava sem saber, ou achava que a pessoa já
+                  estava usando.
+                */}
+                <AcessoPessoa pessoa={pessoa} />
               </div>
 
               <button
@@ -327,6 +406,31 @@ function EditorPessoas({
   )
 }
 
+/** Selo do que a pessoa pode fazer: só assinar a ficha ou também entrar no app. */
+function AcessoPessoa({ pessoa }: { pessoa: Pessoa }) {
+  const situacao = situacaoAcesso(pessoa)
+  const estilo = {
+    ativo: 'bg-emerald-100 text-emerald-800',
+    'convite-pendente': 'bg-amber-100 text-amber-900',
+    'sem-acesso': 'bg-slate-100 text-slate-500',
+    inativo: 'bg-slate-100 text-slate-400',
+  }[situacao]
+  const rotulo = {
+    ativo: 'ACESSA O APP',
+    'convite-pendente': 'CONVITE PENDENTE',
+    'sem-acesso': 'SÓ EQUIPE',
+    inativo: 'INATIVO',
+  }[situacao]
+  return (
+    <span
+      className={`ml-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold ${estilo}`}
+    >
+      {situacao === 'ativo' ? <Mail size={10} /> : <UserIcon size={10} />}
+      {rotulo}
+    </span>
+  )
+}
+
 function FormularioPessoa({
   pessoa,
   pessoas,
@@ -342,6 +446,11 @@ function FormularioPessoa({
   const [rg, setRg] = useState(pessoa.rg)
   // O input mostra só os dígitos; o estado guarda o RG completo com o "R".
   const digitosRg = rg.replace(/^R/i, '')
+  const [email, setEmail] = useState(pessoa.email ?? '')
+  const [convidando, setConvidando] = useState(false)
+  /** Convite já saiu: o cadastro está feito e não há o que salvar por fora. */
+  const [convidou, setConvidou] = useState(false)
+  const [recado, setRecado] = useState<{ ok: boolean; texto: string } | null>(null)
   const [funcao, setFuncao] = useState(pessoa.funcao ?? '')
   const [nivel, setNivel] = useState<NivelAcesso>(pessoa.nivel ?? 'usuario')
   const [ativo, setAtivo] = useState(pessoa.ativo)
@@ -356,6 +465,47 @@ function FormularioPessoa({
   // Só cobra o formato quando o campo já tem conteúdo — senão a tela nasce
   // em vermelho num formulário em branco.
   const rgInvalido = digitosRg.trim().length > 0 && !rgValido(rg)
+
+  /**
+   * Manda o convite agora, sem esperar o "Salvar": o técnico já recebe o
+   * e-mail enquanto o administrador termina o cadastro. Se a conta já existir,
+   * o botão vira "reenviar", porque o caso comum é o convite ter expirado na
+   * caixa de entrada.
+   */
+  const convidar = async () => {
+    setConvidando(true)
+    setRecado(null)
+    try {
+      const primeiro = await convidarTecnico(email, {
+        nome: nome.trim(),
+        rg: rg.trim().toUpperCase(),
+        funcao: funcao.trim() || undefined,
+        nivel,
+        ativo,
+      })
+      if (primeiro.ok) {
+        setConvidou(true)
+        setRecado({
+          ok: true,
+          texto: `Convite enviado para ${email.trim()}. ${nome.trim()} cria a senha pelo link e já entra com este cadastro.`,
+        })
+        return
+      }
+      const jaTem = /já tem conta/i.test(primeiro.erro ?? '')
+      if (jaTem) {
+        const segundo = await reenviarConvite(email)
+        setRecado(
+          segundo.ok
+            ? { ok: true, texto: `Conta já existia. Reenviei o e-mail para ${email.trim()}.` }
+            : { ok: false, texto: segundo.erro ?? 'Não foi possível reenviar.' },
+        )
+        return
+      }
+      setRecado({ ok: false, texto: primeiro.erro ?? 'Não foi possível convidar.' })
+    } finally {
+      setConvidando(false)
+    }
+  }
 
   return (
     <div className="rounded-xl border-2 border-blue-600 bg-white p-3">
@@ -426,6 +576,57 @@ function FormularioPessoa({
           />
         </label>
 
+        <label className="block">
+          <span className="mb-1 block text-[11px] font-medium text-slate-600">
+            E-mail de acesso <span className="font-normal text-slate-400">(opcional)</span>
+          </span>
+          <input
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value)
+              setRecado(null)
+            }}
+            type="email"
+            inputMode="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            placeholder="nome@empresa.com.br"
+            className="w-full rounded-lg border-2 border-slate-300 px-3 py-2.5 text-base text-slate-900 outline-none focus:border-blue-600"
+          />
+          <span className="mt-1 block text-[10px] leading-snug text-slate-500">
+            <strong>Em branco:</strong> a pessoa entra na equipe e pode ser escolhida nas fichas,
+            mas <strong>não acessa o app</strong>. <strong>Preenchido:</strong> recebe o convite e
+            cria a própria senha — você nunca precisa saber a senha dela.
+          </span>
+        </label>
+
+        {/*
+          O convite é o cadastro inteiro: nome, RG e e-mail. Por isso o botão
+          só aparece quando o formulário está válido — convidar sem RG criaria
+          uma conta que não consegue virar funcionário depois.
+        */}
+        {emailValido(email) && valido && !convidou && (
+          <button
+            type="button"
+            onClick={() => void convidar()}
+            disabled={convidando}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-700 py-3 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            <Mail size={15} />
+            {convidando ? 'Enviando convite…' : 'Convidar — a pessoa cria a senha pelo link'}
+          </button>
+        )}
+
+        {recado && (
+          <p
+            className={`rounded-lg p-2 text-[11px] font-medium ${
+              recado.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'
+            }`}
+          >
+            {recado.texto}
+          </p>
+        )}
+
         <div className="block">
           <span className="mb-1 block text-[11px] font-medium text-slate-600">
             Nível de acesso
@@ -481,22 +682,41 @@ function FormularioPessoa({
           </span>
         </button>
 
-        <button
-          onClick={() =>
-            onSalvar({
-              ...pessoa,
-              nome: nome.trim(),
-              rg: rg.trim(),
-              funcao: funcao.trim(),
-              nivel,
-              ativo,
-            })
-          }
-          disabled={!valido}
-          className="w-full rounded-lg bg-blue-700 py-3 text-sm font-semibold text-white disabled:bg-slate-300"
-        >
-          Salvar
-        </button>
+        {/*
+          Sem convite, "Salvar" só guarda o cadastro no aparelho — e o perfil
+          não existe no servidor. Por isso o caminho normal é convidar; o botão
+          fica como saída para quem edita um funcionário que já usa o app.
+        */}
+        {convidou || pessoa.userId ? (
+          <button
+            onClick={() => onCancelar()}
+            className="w-full rounded-lg border-2 border-slate-300 py-3 text-sm font-semibold text-slate-700"
+          >
+            Concluir
+          </button>
+        ) : (
+          <button
+            onClick={() =>
+              onSalvar({
+                ...pessoa,
+                nome: nome.trim(),
+                rg: rg.trim(),
+                email: email.trim().toLowerCase() || undefined,
+                funcao: funcao.trim(),
+                nivel,
+                ativo,
+              })
+            }
+            disabled={!valido}
+            className="w-full rounded-lg border-2 border-slate-300 py-2.5 text-xs font-semibold text-slate-600 disabled:opacity-40"
+          >
+            {/*
+              Este é o caminho normal de quem só faz parte da equipe: entra na
+              ficha pelo RG, sem conta e sem convite.
+            */}
+            Salvar sem acesso ao app
+          </button>
+        )}
       </div>
     </div>
   )

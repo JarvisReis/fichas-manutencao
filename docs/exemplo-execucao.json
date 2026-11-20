@@ -34,21 +34,37 @@
       "sincronizada": false,
       "observacaoGeral": "Medicoes realizadas com cabos desconectados.",
       "valores": [
-        { "itemId": "barr-nucleo-barr", "itemNome": "Barramento X Nucleo X Barramento", "valor": "120", "observacao": "Valor acima do procedimento" },
-        { "itemId": "cabo400-barr", "itemNome": "Cabo 400 mm X Barramento", "valor": "12,5", "observacao": null },
-        { "itemId": "nucleo-carcaca", "itemNome": "Barram. do Nucleo X Carcaca do Nucleo", "valor": "infinito", "observacao": null },
-        { "itemId": "estrutura-terra", "itemNome": "Estrutura X Terra externo", "valor": "450", "observacao": null },
-        { "itemId": "barramento-estrutura", "itemNome": "Barramento X Estrutura", "valor": "600", "observacao": null }
+        {
+          "itemId": "barr-nucleo-barr",
+          "itemNome": "Barramento X Nucleo X Barramento",
+          "valor": "120",
+          "observacao": "Valor acima do procedimento"
+        },
+        {
+          "itemId": "cabo400-barr",
+          "itemNome": "Cabo 400 mm X Barramento",
+          "valor": "12,5",
+          "observacao": null
+        },
+        {
+          "itemId": "nucleo-carcaca",
+          "itemNome": "Barram. do Nucleo X Carcaca do Nucleo",
+          "valor": "infinito",
+          "observacao": null
+        },
+        {
+          "itemId": "estrutura-terra",
+          "itemNome": "Estrutura X Terra externo",
+          "valor": "450",
+          "observacao": null
+        },
+        {
+          "itemId": "barramento-estrutura",
+          "itemNome": "Barramento X Estrutura",
+          "valor": "600",
+          "observacao": null
+        }
       ]
-    }
-  ],
-  "fotos": [
-    {
-      "id": "a1b2c3d4-0000-4e5f-8a9b-0c1d2e3f4a5b",
-      "execucaoId": "6f3a1c2e-8b41-4a77-9d02-1f5c8e7b9a10",
-      "itemId": "barr-nucleo-barr",
-      "mime": "image/jpeg",
-      "base64": "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0a... (string longa em base64)"
     }
   ]
 }

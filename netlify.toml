@@ -1,0 +1,36 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# O app fica público para os 22 técnicos, mas não para o Google.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=(self)"
+    # Nada de indexação: o app é interno.
+    X-Robots-Tag = "noindex, nofollow, noarchive"
+
+# O index.html nunca pode ser cacheado: é ele que aponta para o bundle novo.
+# Com cache longo aqui, o técnico fica preso na versão antiga mesmo com o
+# `autoUpdate` do service worker funcionando.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Os assets têm hash no nome: se o conteúdo muda, o nome muda.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

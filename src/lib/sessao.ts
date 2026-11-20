@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { lerToken } from './auth'
 
 /**
  * Sessão de trabalho no aparelho.
@@ -44,7 +45,14 @@ export function gravarSessao(sessao: Sessao | null) {
 
 /** Hook de sessão: mantém o estado sincronizado com o localStorage. */
 export function useSessao() {
-  const [sessao, setSessao] = useState<Sessao | null>(() => lerSessao())
+  const [sessao, setSessao] = useState<Sessao | null>(() => {
+    const retrato = lerSessao()
+    if (retrato && !lerToken()) {
+      gravarSessao(null)
+      return null
+    }
+    return retrato
+  })
 
   const entrar = useCallback((nova: Sessao) => {
     gravarSessao(nova)
@@ -56,9 +64,25 @@ export function useSessao() {
     setSessao(null)
   }, [])
 
+  /**
+   * Sessão restaurada precisa de token por trás.
+   *
+   * `fichas:sessao` é um retrato de nome/RG/nível no localStorage — sozinho,
+   * ele faria o app abrir como administrador sem senha. A autoridade é o token
+   * do Supabase.
+   *
+   * A checagem mora no estado inicial, e não num efeito: com StrictMode o
+   * efeito roda duas vezes e a segunda execução apagava a sessão que o login
+   * tinha acabado de gravar — era isso que fazia o app "fechar" ao entrar.
+   *
+   * Na prática, o que se limpa aqui é um retrato órfão: sessão salva sem token
+   * (alguém limpou o armazenamento). Token vencido é derrubado pelo servidor
+   * na primeira chamada, que é onde a checagem vale de verdade.
+   */
   useEffect(() => {
     const aoTrocarAba = () => setSessao(lerSessao())
     window.addEventListener('storage', aoTrocarAba)
+
     return () => window.removeEventListener('storage', aoTrocarAba)
   }, [])
 

@@ -16,9 +16,16 @@ interface Props {
   onRestaurado: () => void
   /** reabrir ficha concluída exige administrador; usado no reenvio de correção */
   ehAdministrador: boolean
+  /** abre a tela que lista as cópias guardadas no servidor */
+  onAbrirRecuperacao: () => void
 }
 
-export default function TelaBackup({ onVoltar, onRestaurado, ehAdministrador }: Props) {
+export default function TelaBackup({
+  onVoltar,
+  onRestaurado,
+  ehAdministrador,
+  onAbrirRecuperacao,
+}: Props) {
   const [mensagem, setMensagem] = useState<string | null>(null)
   const [processando, setProcessando] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -63,7 +70,7 @@ export default function TelaBackup({ onVoltar, onRestaurado, ehAdministrador }: 
           reenvioAdmin: ehAdministrador,
         })
         if (r.ok) {
-          setMensagem('Execução sincronizada com o SharePoint.')
+          setMensagem('Execução sincronizada com o servidor.')
           await contarPendentes()
         } else {
           setErro(`Falha ao sincronizar: ${r.erro}`)
@@ -124,7 +131,7 @@ export default function TelaBackup({ onVoltar, onRestaurado, ehAdministrador }: 
     try {
       const r = await exportarBackup()
       const mb = (r.bytes / 1024 / 1024).toFixed(2)
-      setMensagem(`Backup gerado: ${r.execucoes} execução(ões), ${r.fotos} foto(s), ${mb} MB.`)
+      setMensagem(`Backup gerado: ${r.execucoes} execução(ões), ${mb} MB.`)
     } catch (e) {
       setErro(`Falha ao exportar: ${(e as Error).message}`)
     } finally {
@@ -162,7 +169,7 @@ export default function TelaBackup({ onVoltar, onRestaurado, ehAdministrador }: 
         r.pessoas > 0 ? `${r.pessoas} pessoa(s)` : '',
       ].filter(Boolean)
       setMensagem(
-        `Importado: ${r.execucoes} execução(ões) e ${r.fotos} foto(s).` +
+        `Importado: ${r.execucoes} execução(ões).` +
           (cadastros.length > 0 ? ` Cadastros: ${cadastros.join(' e ')}.` : '') +
           (r.ignoradas > 0 ? ` ${r.ignoradas} já existiam e foram mantidas.` : ''),
       )
@@ -195,11 +202,27 @@ export default function TelaBackup({ onVoltar, onRestaurado, ehAdministrador }: 
       <div className="space-y-4 p-4">
         <section className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-4">
           <p className="text-xs leading-relaxed text-amber-900">
-            As execuções ficam salvas apenas neste aparelho até a sincronização com o SharePoint
+            As execuções ficam salvas apenas neste aparelho até a sincronização com o servidor
             existir. Se o celular for perdido, trocado ou o app for desinstalado, os dados se perdem.
             Gere um backup ao fim de cada turno de medições.
           </p>
         </section>
+
+        {ehAdministrador && (
+          <section className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4">
+            <h3 className="mb-1 text-sm font-semibold text-emerald-950">Recuperar do servidor</h3>
+            <p className="mb-3 text-xs leading-relaxed text-emerald-900">
+              O aparelho manda uma cópia automática a cada sincronização, e ela fica guardada no
+              servidor. Se um celular foi limpo, perdido ou trocado, as fichas voltam por aqui.
+            </p>
+            <button
+              onClick={onAbrirRecuperacao}
+              className="w-full rounded-xl bg-emerald-700 py-3 text-sm font-semibold text-white"
+            >
+              Abrir recuperação
+            </button>
+          </section>
+        )}
 
         <section className="rounded-2xl border-2 border-slate-200 bg-white p-4">
           <h3 className="mb-1 text-sm font-semibold text-slate-900">Sincronização</h3>
@@ -242,10 +265,10 @@ export default function TelaBackup({ onVoltar, onRestaurado, ehAdministrador }: 
         </section>
 
         <section className="rounded-2xl border-2 border-slate-200 bg-white p-4">
-          <h3 className="mb-1 text-sm font-semibold text-slate-900">Enviar para o SharePoint</h3>
+          <h3 className="mb-1 text-sm font-semibold text-slate-900">Enviar para o servidor</h3>
           <p className="mb-3 text-xs text-slate-500">
             Envia <strong>uma execução por arquivo</strong>, no formato que o fluxo do Power Automate
-            lê. No celular, escolha salvar no OneDrive/SharePoint — o fluxo processa automaticamente.
+            lê.
           </p>
 
           {listaEnvios === null ? (
@@ -288,7 +311,7 @@ export default function TelaBackup({ onVoltar, onRestaurado, ehAdministrador }: 
         <section className="rounded-2xl border-2 border-slate-200 bg-white p-4">
           <h3 className="mb-1 text-sm font-semibold text-slate-900">Exportar tudo</h3>
           <p className="mb-3 text-xs text-slate-500">
-            Gera um arquivo com todas as execuções e as fotos incluídas.
+            Gera um arquivo com todas as execuções e os cadastros deste aparelho.
           </p>
 
           <div className="space-y-2">

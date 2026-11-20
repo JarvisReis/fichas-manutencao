@@ -1,9 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ChevronDown, Camera, Check, Infinity as Inf, Plus, Save, Trash2, X } from 'lucide-react'
-import { NOME_MARCA, type DefinicaoFicha, type Execucao, type Foto, type Marca, type ValorItem } from '../types'
+import { ArrowLeft, ChevronDown, Check, FileDown, Infinity as Inf, Plus, Save, X } from 'lucide-react'
+import { NOME_MARCA, type DefinicaoFicha, type Execucao, type Marca, type ValorItem } from '../types'
 import { avaliarItem } from '../lib/conformidade'
-import { comprimirImagem, db } from '../lib/db'
 import { lerPessoas } from '../lib/cadastros'
+async function baixarPdfRelatorio(args: Parameters<typeof import('../lib/pdfRelatorio')['baixarPdfRelatorio']>[0]) {
+  const mod = await import('../lib/pdfRelatorio')
+  return mod.baixarPdfRelatorio(args)
+}
+import {
+  estaEmModoRelatorio,
+  tipoEmVigor,
+  topicosDaFicha,
+  type Topico,
+} from '../lib/topicosFicha'
 
 interface Props {
   ficha: DefinicaoFicha
@@ -11,12 +20,24 @@ interface Props {
   /** rascunho é de quem executa; concluída só administrador reabre */
   podeAlterar: boolean
   onVoltar: () => void
+  /**
+   * Leva para a aba de outro bloco que não vive nesta tela.
+   *
+   * Medições é a única aba desenhada aqui. Equipe, Núcleo e Instrumentos são
+   * blocos da tela de identificação, então a aba daqui precisa navegar até lá
+   * em vez de trocar o tópico local — trocar deixava a tela em branco.
+   */
+  onIrParaTopico?: (topico: Topico) => void
   onSalvar: (status: 'rascunho' | 'concluida' | 'pendente') => void
   onAtualizar: (patch: Partial<Execucao>) => void
   /** ficha salva em modo leitura: abre uma manutenção nova do mesmo equipamento */
   onNovaManutencao?: () => void
   /** sem pessoa identificada: o app só visualiza, não grava */
   semIdentificacao?: boolean
+  /**
+   * Abre o editor da ficha (parâmetros: nome, limites, pontos de medição).
+   * Só administrador recebe isto — o técnico não muda o que vai medir.
+   */
 }
 
 /** Patrimônios dos instrumentos guardados nos campos fixos da execução. */
@@ -40,8 +61,6 @@ function formatarDataHora(iso: string | undefined): string {
   })
 }
 
-/** Marcador da foto única anexada à observação final da execução. */
-const ITEM_OBSERVACAO = '__observacao__'
 
 const corResultado = {
   conforme: { card: 'border-emerald-300 bg-emerald-50', badge: 'bg-emerald-600 text-white', texto: 'CONFORME' },
@@ -55,6 +74,7 @@ export default function TelaExecucao({
   execucao,
   podeAlterar,
   onVoltar,
+  onIrParaTopico,
   onSalvar,
   onAtualizar,
   onNovaManutencao,
@@ -62,8 +82,6 @@ export default function TelaExecucao({
 }: Props) {
   const [valores, setValores] = useState<ValorItem[]>(execucao.valores)
   const [obsGeral, setObsGeral] = useState(execucao.observacaoGeral ?? '')
-  const [carregandoFoto, setCarregandoFoto] = useState<string | null>(null)
-  const [fotoObservacaoUrl, setFotoObservacaoUrl] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [nomePorRg, setNomePorRg] = useState<Record<string, string>>({})
 
@@ -109,26 +127,6 @@ export default function TelaExecucao({
     campos[posicao]?.blur()
   }
 
-  // Foto é só da observação final. Fotos antigas presas a um item de medição
-  // são ignoradas aqui — a tela não mostra mais foto por item.
-  useEffect(() => {
-    const urls: string[] = []
-
-    ;(async () => {
-      const registros = await db.fotos.where('execucaoId').equals(execucao.id).toArray()
-      for (const f of registros) {
-        if (f.itemId !== ITEM_OBSERVACAO) continue
-        const url = URL.createObjectURL(f.blob)
-        urls.push(url)
-        setFotoObservacaoUrl(url)
-      }
-    })()
-
-    return () => {
-      urls.forEach((u) => URL.revokeObjectURL(u))
-    }
-  }, [execucao.id])
-
   const aplicarValores = (proximo: ValorItem[]) => {
     setValores(proximo)
     onAtualizar({ valores: proximo })
@@ -167,40 +165,15 @@ export default function TelaExecucao({
     Boolean((execucao.camposFixos[campo] ?? '').trim()),
   ).map(([campo, nome]) => [nome, execucao.camposFixos[campo]] as const)
 
-  const tirarFotoObservacao = async (arquivo: File | undefined | null) => {
-    if (!arquivo) return
-    setCarregandoFoto('observacao')
-    try {
-      const anteriores = await db.fotos.where('execucaoId').equals(execucao.id).toArray()
-      for (const antiga of anteriores.filter((f) => f.itemId === ITEM_OBSERVACAO)) {
-        await db.fotos.delete(antiga.id)
-      }
-      const blob = await comprimirImagem(arquivo)
-      const foto: Foto = {
-        id: crypto.randomUUID(),
-        execucaoId: execucao.id,
-        itemId: ITEM_OBSERVACAO,
-        blob,
-        criadaEm: new Date().toISOString(),
-      }
-      await db.fotos.put(foto)
-      if (fotoObservacaoUrl) URL.revokeObjectURL(fotoObservacaoUrl)
-      setFotoObservacaoUrl(URL.createObjectURL(blob))
-    } catch (erro) {
-      setAviso(`Não foi possível processar a foto: ${(erro as Error).message}`)
-    } finally {
-      setCarregandoFoto(null)
-    }
-  }
-
-  const removerFotoObservacao = async () => {
-    const registros = await db.fotos.where('execucaoId').equals(execucao.id).toArray()
-    for (const f of registros.filter((r) => r.itemId === ITEM_OBSERVACAO)) {
-      await db.fotos.delete(f.id)
-    }
-    if (fotoObservacaoUrl) URL.revokeObjectURL(fotoObservacaoUrl)
-    setFotoObservacaoUrl(null)
-  }
+  /**
+   * Tópicos são ferramenta de **preenchimento** — valem igual para ficha nova e
+   * para ficha reaberta. Ficha concluída é documento: sai numa tela só, de cima
+   * a baixo, como o papel assinado, e nada nela se altera.
+   */
+  const topicos = topicosDaFicha({ ficha })
+  const [topico, setTopico] = useState<Topico | null>(null)
+  const topicoAtivo = tipoEmVigor(topicos, topico)
+  const modoRelatorio = estaEmModoRelatorio(podeAlterar)
 
   const concluir = () => {
     if (!podeAlterar) {
@@ -245,11 +218,51 @@ export default function TelaExecucao({
             {foraDoLimite.length} item(ns) fora do limite
           </div>
         )}
+
+        {/* Tópicos: um bloco por vez, como a ficha de papel. Só no preenchimento —
+            a ficha concluída é relatório e aparece inteira. */}
+        {!modoRelatorio && (
+        <nav className="flex gap-1 overflow-x-auto px-3 pb-2">
+          {topicos.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => {
+                /**
+                 * Fora das medições, esta tela só **mostra** — é relatório.
+                 *
+                 * Quando a ficha é editável (rascunho, ou correção de admin) e
+                 * existe para onde ir, a aba leva à tela de identificação, que
+                 * é onde os campos desses blocos se editam. Sem isso, "corrigir"
+                 * abria abas que só davam para ler.
+                 */
+                if (t.id !== 'medicoes' && onIrParaTopico && !modoRelatorio) {
+                  onIrParaTopico(t.id)
+                  return
+                }
+                setTopico(t.id)
+              }}
+              className={`shrink-0 rounded-lg px-3 py-1.5 text-[11px] font-semibold transition ${
+                topicoAtivo === t.id
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-slate-100 text-slate-600 active:bg-slate-200'
+              }`}
+            >
+              {t.rotulo}
+              {t.id === 'medicoes' && (
+                <span className="ml-1 font-normal opacity-70">
+                  {analises.length - pendentes}/{analises.length}
+                </span>
+              )}
+            </button>
+          ))}
+        </nav>
+        )}
       </header>
 
       <div className="space-y-3 p-4">
         {/* Cabeçalho da manutenção: em ficha salva o técnico precisa ver de quem
             é o equipamento e o que foi usado, não só os números medidos. */}
+        {(modoRelatorio || topicoAtivo === 'identificacao') && (
         <section className="rounded-2xl border-2 border-slate-200 bg-white p-4">
           <h3 className="mb-3 text-sm font-semibold text-slate-900">Identificação</h3>
           <dl className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-sm">
@@ -263,12 +276,6 @@ export default function TelaExecucao({
               ...(execucao.dataFim && execucao.dataFim !== execucao.dataHora
                 ? [['Encerramento', formatarDataHora(execucao.dataFim)]]
                 : []),
-              ...(execucao.nucleoInstalado
-                ? [['Núcleo instalado', execucao.nucleoInstalado]]
-                : []),
-              ...(execucao.camposFixos.serieRetirado
-                ? [['Núcleo retirado', execucao.camposFixos.serieRetirado]]
-                : []),
             ].map(([rotulo, valor]) => (
               <div key={rotulo} className="min-w-0">
                 <dt className="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
@@ -279,10 +286,12 @@ export default function TelaExecucao({
             ))}
           </dl>
 
-          <div className="mt-3 border-t border-slate-200 pt-3">
-            <p className="mb-1.5 text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
-              Equipe
-            </p>
+        </section>
+        )}
+
+        {(modoRelatorio || topicoAtivo === 'equipe') && (
+          <section className="rounded-2xl border-2 border-slate-200 bg-white p-4">
+            <h3 className="mb-3 text-sm font-semibold text-slate-900">Equipe</h3>
             <div className="flex flex-wrap gap-1.5">
               {equipe.length === 0 && <span className="text-sm text-slate-500">—</span>}
               {equipe.map((pessoa, i) => (
@@ -297,28 +306,46 @@ export default function TelaExecucao({
                 </span>
               ))}
             </div>
-          </div>
+          </section>
+        )}
 
-          {instrumentos.length > 0 && (
-            <div className="mt-3 border-t border-slate-200 pt-3">
-              <p className="mb-1.5 text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
-                Instrumentos
-              </p>
-              <ul className="space-y-0.5 text-sm text-slate-800">
-                {instrumentos.map(([nome, patrimonio]) => (
-                  <li key={nome}>
-                    {nome}{' '}
-                    <span className="font-mono text-xs font-semibold text-slate-600">
-                      {patrimonio}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </section>
+        {(modoRelatorio || topicoAtivo === 'nucleo') && (
+          <section className="rounded-2xl border-2 border-slate-200 bg-white p-4">
+            <h3 className="mb-3 text-sm font-semibold text-slate-900">Núcleo</h3>
+            <dl className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-sm">
+              {[
+                ['Núcleo instalado', execucao.nucleoInstalado || '—'],
+                ['Núcleo retirado', execucao.camposFixos.serieRetirado || '—'],
+                ['Tipo de manutenção', execucao.tipoManutencao || '—'],
+              ].map(([rotulo, valor]) => (
+                <div key={rotulo} className="min-w-0">
+                  <dt className="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">
+                    {rotulo}
+                  </dt>
+                  <dd className="truncate font-mono text-sm font-medium text-slate-900">{valor}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        )}
 
-        {ficha.itens.map((item, indice) => {
+        {(modoRelatorio || topicoAtivo === 'instrumentos') && (
+          <section className="rounded-2xl border-2 border-slate-200 bg-white p-4">
+            <h3 className="mb-3 text-sm font-semibold text-slate-900">Instrumentos</h3>
+            <ul className="space-y-1 text-sm text-slate-800">
+              {instrumentos.map(([nome, patrimonio]) => (
+                <li key={nome}>
+                  {nome}{' '}
+                  <span className="font-mono text-xs font-semibold text-slate-600">
+                    {patrimonio}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {(modoRelatorio || topicoAtivo === 'medicoes') && ficha.itens.map((item, indice) => {
           const analise = avaliarItem(item, valorDe(item.id), marca)
           const cores = corResultado[analise.resultado]
           const posicao = comCampo.indexOf(item.id)
@@ -414,6 +441,7 @@ export default function TelaExecucao({
           )
         })}
 
+        {(modoRelatorio || topicoAtivo === 'medicoes') && (
         <section className="rounded-2xl border-2 border-slate-200 bg-white p-4">
           <h3 className="mb-2 text-sm font-semibold text-slate-900">Observação</h3>
           <textarea
@@ -429,57 +457,8 @@ export default function TelaExecucao({
             placeholder="Anotações da execução (opcional)…"
             className="w-full resize-none rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-blue-600"
           />
-
-          <div className="mt-3">
-            {fotoObservacaoUrl ? (
-              <div className="relative">
-                <img
-                  src={fotoObservacaoUrl}
-                  alt="Foto da observação"
-                  className="h-40 w-full rounded-xl border border-slate-200 object-cover"
-                />
-                <div className="mt-2 flex gap-2">
-                  <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-slate-300 bg-white py-2.5 text-xs font-semibold text-slate-700 active:scale-[0.99]">
-                    <Camera size={16} />
-                    {carregandoFoto === 'observacao' ? 'Processando…' : 'Trocar foto'}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      className="hidden"
-                      onChange={(e) => {
-                        void tirarFotoObservacao(e.target.files?.[0])
-                        e.currentTarget.value = ''
-                      }}
-                    />
-                  </label>
-                  <button
-                    onClick={() => void removerFotoObservacao()}
-                    className="rounded-xl border-2 border-red-300 px-3 py-2.5 text-red-700 active:bg-red-50"
-                    aria-label="Remover foto da observação"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 py-3 text-xs font-semibold text-slate-600 active:scale-[0.99]">
-                <Camera size={16} />
-                {carregandoFoto === 'observacao' ? 'Processando…' : 'Foto (opcional)'}
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={(e) => {
-                    void tirarFotoObservacao(e.target.files?.[0])
-                    e.currentTarget.value = ''
-                  }}
-                />
-              </label>
-            )}
-          </div>
         </section>
+        )}
       </div>
 
       {aviso && (
@@ -508,6 +487,12 @@ export default function TelaExecucao({
                 <Plus size={18} /> Nova manutenção deste equipamento
               </button>
             )}
+            <button
+              onClick={() => void baixarPdfRelatorio({ ficha, execucao, nomes: nomePorRg })}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-slate-300 py-3 text-sm font-semibold text-slate-700 active:bg-slate-100"
+            >
+              <FileDown size={18} /> Baixar relatório em PDF
+            </button>
           </div>
         ) : (
         <div className="flex gap-2">

@@ -34,7 +34,17 @@ export default defineConfig({
         // antigo servia o HTML velho indefinidamente: publicação nova nunca
         // aparecia no aparelho e parecia que nada tinha sido corrigido.
         globPatterns: ['**/*.{js,css,svg,png,woff2}'],
-        globIgnores: ['**/index.html', '**/registerSW.js'],
+        globIgnores: [
+          '**/index.html',
+          '**/registerSW.js',
+          // Pedaços do PDF (jsPDF + html2canvas + sanitize) NÃO entram no
+          // precache: são 750 kB que ninguém usa para abrir o app. Ficam no
+          // cache de runtime abaixo, na primeira vez que alguém gera relatório.
+          '**/pdfRelatorio-*.js',
+          '**/html2canvas-*.js',
+          '**/index.es-*.js',
+          '**/purify.es-*.js',
+        ],
         // A navegação vai à rede primeiro e cai no cache quando não há sinal.
         // O `navigateFallback` PRECISA ser nulo: com o padrão do plugin ele
         // registra uma rota que serve `index.html` do precache — mas o arquivo
@@ -51,6 +61,17 @@ export default defineConfig({
               cacheName: 'fichas-html',
               networkTimeoutSeconds: 4,
               expiration: { maxEntries: 4 },
+            },
+          },
+          {
+            // PDF sob demanda: só é baixado quando alguém toca em "baixar
+            // relatório". Depois disso fica em cache, então gerar PDF offline
+            // continua funcionando nas próximas vezes.
+            urlPattern: /\/assets\/(pdfRelatorio|html2canvas|index\.es|purify\.es)-.*\.js$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'fichas-pdf',
+              expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 90 },
             },
           },
         ],

@@ -234,6 +234,25 @@ export const FICHAS: DefinicaoFicha[] = [
   },
 ]
 
+/**
+ * Cópia em memória das fichas em vigor.
+ *
+ * `getFicha` é chamado de 20 lugares, muitos deles síncronos (render, PDF,
+ * sincronização). Transformá-lo em async obrigaria a mexer em todos. Em vez
+ * disso, o app carrega os ajustes do administrador uma vez na abertura
+ * (`carregarFichas`) e troca esta tabela aqui.
+ */
+let emVigor: DefinicaoFicha[] = FICHAS
+
+/** Troca as definições ativas. Chamado na abertura do app e após salvar ajuste. */
+export function definirFichasEmVigor(lista: DefinicaoFicha[]): void {
+  emVigor = lista
+}
+
+export function fichasAtivas(): DefinicaoFicha[] {
+  return emVigor
+}
+
 export function getFicha(id: string): DefinicaoFicha | undefined {
-  return FICHAS.find((f) => f.id === id)
+  return emVigor.find((f) => f.id === id)
 }

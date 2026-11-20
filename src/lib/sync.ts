@@ -1,34 +1,31 @@
 import { db } from './db'
 export { obterEndpointAdmin } from './db'
+import { lerToken } from './auth'
 import { getFicha } from '../config/fichas'
 import { avaliarItem, limiteExibido } from './conformidade'
-import type { DefinicaoFicha, Marca } from '../types'
+import { gravarEquipamentos, type Equipamento } from './cadastros'
+import type { DefinicaoFicha, Execucao, Marca } from '../types'
 
 /**
- * Payload de uma execução no formato que o Power Automate consome.
+ * Payload de uma execução, no formato que o app envia ao servidor.
  *
- * Mudança de contrato (v2): em vez de um pacote com `execucoes[]` + `fotos[]`,
- * cada envio é UM objeto de execução. Assim o fluxo grava direto em
- * `FichasExecucoes` sem loop de validação, e o núcleo instalado/retirado vira
- * campo próprio da lista (é a fonte da verdade do vínculo núcleo↔contator).
+ * Contrato v3 (2026-11-18): fim do SharePoint e fim das fotos. Cada envio é UM
+ * objeto de execução, gravado na tabela `execucoes` do Supabase. O núcleo
+ * instalado/retirado continua sendo campo próprio — é a fonte da verdade do
+ * vínculo núcleo↔contator.
  */
 export type ResultadoExportado = 'conforme' | 'nao_conforme' | 'na'
 
 export const FORMATO_ENVIO = 'fichas-execucao'
-export const VERSAO_ENVIO = 2
-
-export interface FotoExportada {
-  id: string
-  itemId: string
-  mime: string
-  base64: string
-}
+export const VERSAO_ENVIO = 3
 
 export interface ExecucaoExportada {
   formato: typeof FORMATO_ENVIO
   versao: typeof VERSAO_ENVIO
   /** chave de idempotência usada pelo fluxo (ExecucaoId) */
   id: string
+  /** mesma chave, com o nome que o servidor de sync espera */
+  client_id: string
   codigo: string
   fichaId: string
   fichaNome: string
@@ -57,7 +54,6 @@ export interface ExecucaoExportada {
     unidade?: string
     limite?: string
   }[]
-  fotos: FotoExportada[]
 }
 
 /** Monta o payload de uma execução pronta para envio. */
@@ -65,18 +61,6 @@ export async function montarEnvio(execucaoId: string): Promise<ExecucaoExportada
   const exec = await db.execucoes.get(execucaoId)
   if (!exec) return null
   const ficha = getFicha(exec.fichaId)
-  const fotos = await db.fotos.where('execucaoId').equals(execucaoId).toArray()
-
-  const fotosExportadas: FotoExportada[] = []
-  for (const foto of fotos) {
-    fotosExportadas.push({
-      id: foto.id,
-      itemId: foto.itemId,
-      mime: foto.blob.type || 'image/jpeg',
-      base64: await blobParaBase64(foto.blob),
-    })
-  }
-
   const valores = mapearValores(exec, ficha)
   const naoConformes = valores.filter((v) => v.resultado === 'nao_conforme').length
 
@@ -84,6 +68,12 @@ export async function montarEnvio(execucaoId: string): Promise<ExecucaoExportada
     formato: FORMATO_ENVIO,
     versao: VERSAO_ENVIO,
     id: exec.id,
+    /**
+     * O servidor lê `client_id` — é a chave de idempotência da tabela
+     * `execucoes`. Sem ela o envio volta 400 ("execução sem client_id") e a
+     * ficha nunca sai da fila, por mais que o técnico tente.
+     */
+    client_id: exec.id,
     codigo: exec.codigo,
     fichaId: exec.fichaId,
     fichaNome: ficha?.nome ?? exec.fichaId,
@@ -102,27 +92,85 @@ export async function montarEnvio(execucaoId: string): Promise<ExecucaoExportada
     aparelho: detectarAparelho(),
     cabecalho: exec.cabecalho,
     valores,
-    fotos: fotosExportadas,
   }
 }
 
-/** Cabeçalhos do envio, incluindo o token do proxy quando configurado. */
+/**
+ * Cabeçalhos do envio de fichas.
+ *
+ * Usa o mesmo JWT do Supabase que o app usa para entrar — quem valida é o
+ * servidor de sync. Antes esta função lia `fichas:syncToken`, chave da época em
+ * que o envio era um proxy com token próprio; ela nunca é preenchida hoje, e o
+ * POST seguia sem `Authorization`. O servidor respondia 401 e a ficha ficava
+ * parada para sempre na fila.
+ */
 function cabecalhos(extra: Record<string, string> = {}): Record<string, string> {
   const base: Record<string, string> = { ...extra }
-  try {
-    const token = localStorage.getItem('fichas:syncToken')
-    if (token && token.trim()) base.Authorization = `Bearer ${token.trim()}`
-  } catch {
-    /* localStorage indisponível */
-  }
+  const token = lerToken() ?? ''
+  if (token.trim()) base.Authorization = `Bearer ${token.trim()}`
   return base
 }
 
 export interface ResultadoEnvio {
-  /** gravações efetivamente feitas no SharePoint */
+  /** gravações efetivamente confirmadas pelo servidor */
   gravadas: number
   ignoradas: number
   falhas: { id: string; codigo: string; erro: string }[]
+}
+
+export interface ResultadoHistorico {
+  ok: boolean
+  baixadas: number
+  erro?: string
+}
+
+/**
+ * Traz do servidor as fichas já encerradas e guarda no aparelho.
+ *
+ * A sincronização só subia. Quem preencheu no celular tinha a lista; o
+ * computador do escritório abria a home sem recentes e sem histórico, porque o
+ * IndexedDB dele nunca recebeu nada. O servidor é a fonte comum — aqui ele
+ * devolve as fichas (as do próprio técnico; o administrador vê todas).
+ *
+ * Rascunho não desce de propósito: rascunho é trabalho em andamento no
+ * aparelho de quem começou.
+ */
+export async function baixarHistorico(endpoint: string): Promise<ResultadoHistorico> {
+  if (!lerToken()) return { ok: false, baixadas: 0, erro: 'sem sessão' }
+  try {
+    const url = `${endpoint.replace(/\/$/, '')}/historico`
+    const r = await fetch(url, { headers: cabecalhos() })
+    if (r.status === 401 || r.status === 403) {
+      return { ok: false, baixadas: 0, erro: 'sem permissão' }
+    }
+    if (!r.ok) return { ok: false, baixadas: 0, erro: `HTTP ${r.status}` }
+    const dados = (await r.json()) as { execucoes?: Execucao[]; equipamentos?: unknown[] }
+    const lista = Array.isArray(dados.execucoes) ? dados.execucoes : []
+    let baixadas = 0
+    for (const remota of lista) {
+      if (!remota?.id) continue
+      const local = await db.execucoes.get(remota.id)
+      // O local manda enquanto não sincronizou: é a ficha em andamento.
+      if (local && !local.sincronizada) continue
+      // Só sobrescreve se a versão do servidor for mais nova.
+      if (local && Date.parse(local.atualizadaEm) > Date.parse(remota.atualizadaEm)) continue
+      await db.execucoes.put(remota)
+      baixadas++
+    }
+    // Equipamentos do servidor viram a lista local do aparelho. Sem isso a home
+    // de um aparelho novo não tinha o que mostrar nem em que tocar.
+    //
+    // Lista vazia também é resposta: significa que o servidor não tem cadastro
+    // nenhum, e insistir na lista antiga mantinha na tela o contator que já
+    // tinha sido apagado lá. Apagar equipamento NO SERVIDOR é intenção do
+    // administrador; guardar a cópia local não é "modo offline", é resíduo.
+    if (Array.isArray(dados.equipamentos)) {
+      await gravarEquipamentos(dados.equipamentos as Equipamento[])
+    }
+    return { ok: true, baixadas }
+  } catch (e) {
+    return { ok: false, baixadas: 0, erro: (e as Error).message }
+  }
 }
 
 /**
@@ -179,7 +227,7 @@ export async function sincronizarPendentes(
   return resultado
 }
 
-/** Busca o núcleo instalado de um equipamento direto da fonte (SharePoint), se houver endpoint. */
+/** Busca o núcleo instalado de um equipamento direto da fonte (servidor), se houver endpoint. */
 export async function lerNucleoDoServidor(
   endpoint: string,
   equipamento: string,
@@ -221,25 +269,6 @@ function traduzirResultado(
   return r === 'conforme' || r === 'nao_conforme' || r === 'na' ? r : 'na'
 }
 
-export function blobParaBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const leitor = new FileReader()
-    leitor.onload = () => {
-      const resultado = String(leitor.result ?? '')
-      resolve(resultado.slice(resultado.indexOf(',') + 1))
-    }
-    leitor.onerror = () => reject(new Error('Falha ao ler a foto'))
-    leitor.readAsDataURL(blob)
-  })
-}
-
-export function base64ParaBlob(base64: string, mime: string): Blob {
-  const binario = atob(base64)
-  const bytes = new Uint8Array(binario.length)
-  for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i)
-  return new Blob([bytes], { type: mime })
-}
-
 function detectarAparelho(): string {
   const ua = navigator.userAgent
   if (/iPhone|iPad|iPod/.test(ua)) return 'iOS'
@@ -252,17 +281,43 @@ function detectarAparelho(): string {
 /**
  * Cadastros e exclusão de execução só passam pelo serviço de administração, com
  * senha. O app não envia cadastro pelo endpoint comum: assim um aparelho
- * comprometido não altera a equipe nem apaga histórico no SharePoint.
+ * comprometido não altera a equipe nem apaga histórico no servidor.
  */
 function cabecalhosAdmin(): Record<string, string> {
   const base: Record<string, string> = { 'Content-Type': 'application/json' }
-  try {
-    const token = localStorage.getItem('fichas:syncToken')
-    if (token && token.trim()) base.Authorization = `Bearer ***)}`
-  } catch {
-    /* localStorage indisponível */
-  }
+  // O servidor de sync confere o JWT do Supabase, o mesmo que o app usa para
+  // entrar. O token antigo (`fichas:syncToken`) era de quando o admin tinha
+  // senha própria — não serve mais.
+  const token = lerToken() ?? ''
+  if (token.trim()) base.Authorization = `Bearer ${token.trim()}`
   return base
+}
+
+/**
+ * Puxa a equipe do servidor.
+ *
+ * A lista de técnicos tem de valer para todo mundo, não só para o aparelho
+ * onde foi digitada. O servidor devolve o que está em `perfis`; o aparelho
+ * guarda a cópia local para continuar funcionando offline.
+ */
+export async function baixarEquipe(
+  endpoint: string,
+): Promise<{ ok: boolean; pessoas?: unknown[]; erro?: string; silencioso?: boolean }> {
+  const base = endpoint.replace(/\/$/, '')
+  try {
+    const r = await fetch(`${base}/equipe`, { headers: cabecalhosAdmin() })
+    /**
+     * Leitura liberada para qualquer usuário ativo; 401/403 aqui significa
+     * conta sem perfil ou desativada. Não é falha a exibir: a lista local
+     * continua valendo.
+     */
+    if (r.status === 401 || r.status === 403) return { ok: false, silencioso: true }
+    if (!r.ok) return { ok: false, erro: `HTTP ${r.status}` }
+    const dados = (await r.json()) as { pessoas?: unknown[] }
+    return { ok: true, pessoas: dados.pessoas ?? [] }
+  } catch (e) {
+    return { ok: false, erro: `Sem conexão com ${base}: ${(e as Error).message}` }
+  }
 }
 
 export interface RespostaAdmin {
@@ -297,5 +352,89 @@ export const enviarPessoas = (endpoint: string, pessoas: unknown[]) =>
 export const enviarEquipamentos = (endpoint: string, equipamentos: unknown[]) =>
   postAdmin(endpoint, '/admin/equipamentos', { equipamentos })
 
+/**
+ * Puxa a lista de equipamentos do servidor.
+ *
+ * O administrador publica; os outros aparelhos recebem. Sem isso um aparelho
+ * novo ficava sem nenhum equipamento e o técnico não abria ficha.
+ */
+export async function baixarEquipamentos(
+  endpoint: string,
+): Promise<{ ok: boolean; equipamentos?: unknown[]; erro?: string; silencioso?: boolean }> {
+  const base = endpoint.replace(/\/$/, '')
+  try {
+    const r = await fetch(`${base}/equipamentos`, { headers: cabecalhosAdmin() })
+    if (r.status === 401 || r.status === 403) return { ok: false, silencioso: true }
+    if (!r.ok) return { ok: false, erro: `HTTP ${r.status}` }
+    const dados = (await r.json()) as { equipamentos?: unknown[] }
+    return { ok: true, equipamentos: dados.equipamentos ?? [] }
+  } catch (e) {
+    return { ok: false, erro: `Sem conexão com ${base}: ${(e as Error).message}` }
+  }
+}
+
 export const excluirExecucaoNoServidor = (endpoint: string, execucaoId: string) =>
   postAdmin(endpoint, `/admin/execucoes/${encodeURIComponent(execucaoId)}/excluir`, {})
+
+/**
+ * Manda a cópia de segurança do aparelho para o servidor.
+ *
+ * O dado vive no IndexedDB, e "limpar cache" apaga tudo sem aviso — foi assim
+ * que uma ficha inteira se perdeu: nunca subiu, existia só no navegador, e o
+ * técnico limpou o cache. Aqui o pacote completo (execuções + cadastros) fica
+ * guardado no servidor, fora do alcance do navegador.
+ *
+ * Falha em silêncio de propósito: backup não pode virar erro na cara do técnico
+ * nem travar a sincronização. Quem quiser conferir tem a tela de backup.
+ */
+export async function enviarBackupAutomatico(
+  endpoint: string,
+  pacote: unknown,
+): Promise<{ ok: boolean; ignorado?: string; erro?: string }> {
+  try {
+    const r = await fetch(`${endpoint.replace(/\/$/, '')}/backups`, {
+      method: 'POST',
+      headers: cabecalhos({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ origem: 'auto', aparelho: detectarAparelho(), conteudo: pacote }),
+    })
+    if (r.status === 401 || r.status === 403) return { ok: false, erro: 'sem permissão' }
+    if (!r.ok) return { ok: false, erro: `HTTP ${r.status}` }
+    const dados = (await r.json()) as { ignorado?: string }
+    return { ok: true, ignorado: dados.ignorado }
+  } catch (e) {
+    return { ok: false, erro: (e as Error).message }
+  }
+}
+
+/** Lista os backups guardados no servidor (só administrador). */
+export async function listarBackups(
+  endpoint: string,
+): Promise<{ ok: boolean; backups?: unknown[]; erro?: string }> {
+  try {
+    const r = await fetch(`${endpoint.replace(/\/$/, '')}/backups`, { headers: cabecalhos() })
+    if (r.status === 401 || r.status === 403) return { ok: false, erro: 'sem permissão' }
+    if (!r.ok) return { ok: false, erro: `HTTP ${r.status}` }
+    const dados = (await r.json()) as { backups?: unknown[] }
+    return { ok: true, backups: dados.backups ?? [] }
+  } catch (e) {
+    return { ok: false, erro: (e as Error).message }
+  }
+}
+
+/** Baixa o conteúdo de um backup do servidor para restauração. */
+export async function baixarBackup(
+  endpoint: string,
+  id: number,
+): Promise<{ ok: boolean; conteudo?: unknown; erro?: string }> {
+  try {
+    const r = await fetch(`${endpoint.replace(/\/$/, '')}/backups/${id}`, {
+      headers: cabecalhos(),
+    })
+    if (r.status === 401 || r.status === 403) return { ok: false, erro: 'sem permissão' }
+    if (!r.ok) return { ok: false, erro: `HTTP ${r.status}` }
+    const dados = (await r.json()) as { conteudo?: unknown }
+    return { ok: true, conteudo: dados.conteudo }
+  } catch (e) {
+    return { ok: false, erro: (e as Error).message }
+  }
+}

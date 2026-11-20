@@ -64,8 +64,8 @@ export default function TelaHistorico({
 
   /**
    * A exclusão é de administrador: o aparelho apaga a cópia local e o serviço de
-   * administração apaga a linha no SharePoint. Sem servidor configurado, apaga
-   * só aqui e avisa — apagar no SharePoint exige a senha guardada lá.
+   * administração apaga a linha no servidor. Sem servidor configurado, apaga só
+   * aqui e avisa — apagar no servidor exige credencial de administrador.
    */
   const excluir = async (id: string) => {
     if (excluindo) return;
@@ -86,15 +86,13 @@ export default function TelaHistorico({
 
       // A cópia local some mesmo sem servidor — senão o item fica na tela para
       // sempre depois de o administrador confirmar a exclusão.
-      const fotos = await db.fotos.where("execucaoId").equals(id).toArray();
-      for (const f of fotos) await db.fotos.delete(f.id);
       await db.execucoes.delete(id);
       setConfirmando(null);
       setAviso({
         erro: false,
         texto: endpoint
-          ? "Execução excluída no aparelho e no SharePoint."
-          : "Execução excluída deste aparelho. Sem serviço de administração, a linha do SharePoint (se existir) não é tocada.",
+          ? "Execução excluída no aparelho e no servidor."
+          : "Execução excluída deste aparelho. Sem conexão com o servidor, o registro remoto não é tocado.",
       });
     } finally {
       setExcluindo(false);
@@ -102,9 +100,9 @@ export default function TelaHistorico({
   };
 
   /**
-   * Apaga TODAS as execuções deste aparelho, com as fotos.
+   * Apaga TODAS as execuções deste aparelho.
    *
-   * Só local de propósito: apagar linha por linha no SharePoint exigiria uma
+   * Só local de propósito: apagar linha por linha no servidor exigiria uma
    * requisição por ficha e, se a rede cair no meio, sobra um estado meio
    * apagado que ninguém consegue explicar depois. Para limpar o servidor, o
    * caminho é o de sempre: exclusão individual, que confirma com o servidor.
@@ -114,15 +112,11 @@ export default function TelaHistorico({
     setLimpandoTudo(true);
     try {
       const ids = new Set((execucoes ?? []).map((e) => e.id));
-      const fotos = await db.fotos.toArray();
-      for (const f of fotos) {
-        if (ids.has(f.execucaoId)) await db.fotos.delete(f.id);
-      }
       for (const id of ids) await db.execucoes.delete(id);
       setConfirmandoLimpeza(null);
       setAviso({
         erro: false,
-        texto: `${ids.size} execução(ões) apagada(s) deste aparelho. No SharePoint, se houver linha, é preciso excluir pelo botão individual.`,
+        texto: `${ids.size} execução(ões) apagada(s) deste aparelho. No servidor, a exclusão é individual, pelo botão de cada ficha.`,
       });
     } finally {
       setLimpandoTudo(false);
@@ -392,12 +386,12 @@ export default function TelaHistorico({
             </h2>
             <p className="mt-2 text-sm text-slate-600">
               Serão apagadas <strong>{confirmandoLimpeza} execução(ões)</strong>{" "}
-              deste aparelho, incluindo as fotos. Os cadastros de equipamentos e
+              deste aparelho. Os cadastros de equipamentos e
               pessoas não são tocados. Não há como desfazer.
             </p>
             <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
-              Isto apaga só a cópia local. Fichas já publicadas continuam no
-              SharePoint.
+              Isto apaga só a cópia local. Fichas já enviadas continuam no
+              servidor.
             </p>
             <div className="mt-4 flex gap-2">
               <button
@@ -426,7 +420,7 @@ export default function TelaHistorico({
             </h2>
             <p className="mt-2 text-sm text-slate-600">
               A ficha <strong>{confirmando.codigo}</strong> será apagada deste
-              aparelho, incluindo as fotos. Não há como desfazer.
+              aparelho. Não há como desfazer.
             </p>
             <div className="mt-4 flex gap-2">
               <button

@@ -2,10 +2,12 @@ import { db } from './db'
 import { getFicha } from '../config/fichas'
 import { avaliarItem, limiteExibido } from './conformidade'
 import {
+  chaveDoEquipamento,
   gravarEquipamentos,
   gravarPessoas,
   lerEquipamentos,
   lerPessoas,
+  semEquipamentosRepetidos,
   type Equipamento,
   type Pessoa,
 } from './cadastros'
@@ -45,7 +47,6 @@ export interface PacoteBackup {
       limite?: string
     }[]
   }[]
-  fotos: { id: string; execucaoId: string; itemId: string; base64: string; mime: string }[]
   /**
    * Cadastros do aparelho. Opcional porque backups gerados antes desta versão
    * não os tinham — nesses, a importação traz só as fichas.
@@ -59,20 +60,8 @@ export interface PacoteBackup {
 /** Lê tudo do IndexedDB e monta o pacote de backup (JSON serializável). */
 export async function montarBackup(): Promise<PacoteBackup> {
   const execucoes = await db.execucoes.toArray()
-  const fotos = await db.fotos.toArray()
   const equipamentos = await lerEquipamentos()
   const pessoas = await lerPessoas()
-
-  const fotosSerializadas: PacoteBackup['fotos'] = []
-  for (const foto of fotos) {
-    fotosSerializadas.push({
-      id: foto.id,
-      execucaoId: foto.execucaoId,
-      itemId: foto.itemId,
-      mime: foto.blob.type || 'image/jpeg',
-      base64: await blobParaBase64(foto.blob),
-    })
-  }
 
   return {
     formato: 'fichas-backup',
@@ -99,28 +88,15 @@ export async function montarBackup(): Promise<PacoteBackup> {
         valores: mapearValores(exec, ficha),
       }
     }),
-    fotos: fotosSerializadas,
     cadastros: { equipamentos, pessoas },
   }
 }
 
-/** Monta o pacote de UMA execução, no mesmo formato que o fluxo do Power Automate lê. */
+/** Monta o pacote de UMA execução, no mesmo formato do envio ao servidor. */
 export async function montarPacoteExecucao(execucaoId: string): Promise<PacoteBackup | null> {
   const exec = await db.execucoes.get(execucaoId)
   if (!exec) return null
   const ficha = getFicha(exec.fichaId)
-  const fotos = await db.fotos.where('execucaoId').equals(execucaoId).toArray()
-
-  const fotosSerializadas: PacoteBackup['fotos'] = []
-  for (const foto of fotos) {
-    fotosSerializadas.push({
-      id: foto.id,
-      execucaoId: foto.execucaoId,
-      itemId: foto.itemId,
-      mime: foto.blob.type || 'image/jpeg',
-      base64: await blobParaBase64(foto.blob),
-    })
-  }
 
   return {
     formato: 'fichas-backup',
@@ -146,7 +122,6 @@ export async function montarPacoteExecucao(execucaoId: string): Promise<PacoteBa
         valores: mapearValores(exec, ficha),
       },
     ],
-    fotos: fotosSerializadas,
   }
 }
 
@@ -175,7 +150,7 @@ export async function exportarExecucao(execucaoId: string): Promise<{ nome: stri
   return { nome, bytes: blob.size }
 }
 
-/** Compartilha uma execucao pelo menu nativo (para salvar no OneDrive/SharePoint). */
+/** Compartilha uma execucao pelo menu nativo do celular. */
 export async function compartilharExecucao(execucaoId: string): Promise<boolean> {
   const pacote = await montarPacoteExecucao(execucaoId)
   if (!pacote) throw new Error('Execucao nao encontrada')
@@ -196,7 +171,7 @@ export async function compartilharExecucao(execucaoId: string): Promise<boolean>
 }
 
 /** Gera o arquivo e dispara o download. */
-export async function exportarBackup(): Promise<{ execucoes: number; fotos: number; bytes: number }> {
+export async function exportarBackup(): Promise<{ execucoes: number; bytes: number }> {
   const pacote = await montarBackup()
   const json = JSON.stringify(pacote, null, 2)
   const blob = new Blob([json], { type: 'application/json' })
@@ -204,7 +179,7 @@ export async function exportarBackup(): Promise<{ execucoes: number; fotos: numb
   const nome = `fichas-backup-${new Date().toISOString().slice(0, 10)}.json`
   baixarBlob(blob, nome)
 
-  return { execucoes: pacote.execucoes.length, fotos: pacote.fotos.length, bytes: blob.size }
+  return { execucoes: pacote.execucoes.length, bytes: blob.size }
 }
 
 /** Compartilha o arquivo pelo menu nativo do celular (quando disponível). */
@@ -218,23 +193,27 @@ export async function compartilharBackup(): Promise<boolean> {
     await navigator.share({
       files: [arquivo],
       title: 'Backup das fichas',
-      text: `${pacote.execucoes.length} execução(ões) · ${pacote.fotos.length} foto(s)`,
+      text: `${pacote.execucoes.length} execução(ões) e os cadastros`, 
     })
     return true
   }
   return false
 }
 
-/** Restaura um pacote exportado. Não sobrescreve execuções existentes. */
-export async function importarBackup(texto: string): Promise<{
+/**
+ * Restaura um pacote já em memória.
+ *
+ * Separado de `importarBackup` porque o pacote agora chega de dois lugares: do
+ * arquivo que o técnico escolhe e do backup guardado no servidor. O trabalho é
+ * o mesmo — não faz sentido ter duas restaurações com regras que divergem com
+ * o tempo.
+ */
+export async function restaurarPacote(pacote: PacoteBackup): Promise<{
   execucoes: number
-  fotos: number
   ignoradas: number
-  /** quantos cadastros voltaram — 0 em backup antigo, que só tinha fichas */
   equipamentos: number
   pessoas: number
 }> {
-  const pacote = JSON.parse(texto) as PacoteBackup
   // Aceita o rótulo antigo: backups gerados antes da troca de nome ficaram com
   // `fichas-metro-backup` gravado no arquivo. Recusar seria apagar o histórico
   // de quem já tinha backup na mão.
@@ -248,10 +227,11 @@ export async function importarBackup(texto: string): Promise<{
   let pessoasImportadas = 0
   if (pacote.cadastros) {
     const equipAtuais = await lerEquipamentos()
-    const nomesAtuais = new Set(equipAtuais.map((e) => e.nome.trim().toLowerCase()))
-    const novosEquip = (pacote.cadastros.equipamentos ?? []).filter(
-      (e) => !nomesAtuais.has(e.nome.trim().toLowerCase()),
-    )
+    const chavesAtuais = new Set(equipAtuais.map(chaveDoEquipamento))
+    // Duas linhas com o mesmo nome no próprio backup também caem fora: um
+    // backup feito enquanto a duplicata existia a recriava inteira aqui.
+    const candidatos = semEquipamentosRepetidos(pacote.cadastros.equipamentos ?? [])
+    const novosEquip = candidatos.filter((e) => !chavesAtuais.has(chaveDoEquipamento(e)))
     if (novosEquip.length > 0) {
       await gravarEquipamentos([...equipAtuais, ...novosEquip])
       equipamentosImportados = novosEquip.length
@@ -275,14 +255,14 @@ export async function importarBackup(texto: string): Promise<{
   let equipamentosDasFichas = 0
   {
     const atuais = await lerEquipamentos()
-    const porNome = new Map(atuais.map((e) => [e.nome.trim().toLowerCase(), true]))
+    const porNome = new Set(atuais.map(chaveDoEquipamento))
     const criados: Equipamento[] = []
     for (const exec of pacote.execucoes) {
       const nome = (exec.camposFixos?.equipamento ?? '').trim()
       if (!nome) continue
-      const chave = nome.toLowerCase()
+      const chave = chaveDoEquipamento({ nome } as Equipamento)
       if (porNome.has(chave)) continue
-      porNome.set(chave, true)
+      porNome.add(chave)
       criados.push({
         id: crypto.randomUUID(),
         nome,
@@ -332,30 +312,30 @@ export async function importarBackup(texto: string): Promise<{
     importadas++
   }
 
-  let fotosImportadas = 0
-  for (const foto of pacote.fotos ?? []) {
-    const existente = await db.fotos.get(foto.id)
-    if (existente) continue
-    await db.fotos.put({
-      id: foto.id,
-      execucaoId: foto.execucaoId,
-      itemId: foto.itemId,
-      blob: base64ParaBlob(foto.base64, foto.mime),
-      criadaEm: new Date().toISOString(),
-    })
-    fotosImportadas++
-  }
-
   return {
     execucoes: importadas,
-    fotos: fotosImportadas,
     ignoradas,
     equipamentos: equipamentosImportados + equipamentosDasFichas,
     pessoas: pessoasImportadas,
   }
 }
 
-/** Item avaliado, pronto para o Power Automate apenas transportar (sem recalcular limites). */
+/**
+ * Restaura a partir do texto de um arquivo de backup.
+ *
+ * Mantido como porta de entrada porque a tela de backup e os backups antigos
+ * já falam esta língua: aqui só se lê o JSON e se entrega ao trabalho comum.
+ */
+export async function importarBackup(texto: string): Promise<{
+  execucoes: number
+  ignoradas: number
+  equipamentos: number
+  pessoas: number
+}> {
+  return restaurarPacote(JSON.parse(texto) as PacoteBackup)
+}
+
+/** Item avaliado, já com o veredito calculado (o servidor não recalcula limites). */
 function mapearValores(
   exec: { marca?: Marca; valores: { itemId: string; valor: string; observacao?: string }[] },
   ficha: DefinicaoFicha | undefined,
@@ -390,25 +370,6 @@ function baixarBlob(blob: Blob, nome: string) {
   link.click()
   link.remove()
   setTimeout(() => URL.revokeObjectURL(url), 10_000)
-}
-
-function blobParaBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const leitor = new FileReader()
-    leitor.onload = () => {
-      const resultado = String(leitor.result ?? '')
-      resolve(resultado.slice(resultado.indexOf(',') + 1))
-    }
-    leitor.onerror = () => reject(new Error('Falha ao ler a foto'))
-    leitor.readAsDataURL(blob)
-  })
-}
-
-function base64ParaBlob(base64: string, mime: string): Blob {
-  const binario = atob(base64)
-  const bytes = new Uint8Array(binario.length)
-  for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i)
-  return new Blob([bytes], { type: mime })
 }
 
 function detectarAparelho(): string {

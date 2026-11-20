@@ -80,7 +80,7 @@ sudo chmod 600 /etc/fichas-sync.env
 
 # teste rápido
 set -a; . /etc/fichas-sync.env; set +a
-node projects/fichas-metro/server/sync-server.mjs
+node /home/ricardo/projetos/fichas-medicao/server/sync-server.mjs
 curl -s localhost:8787/saude
 ```
 
@@ -89,13 +89,13 @@ Serviço systemd (fica de pé após reboot):
 ```bash
 sudo tee /etc/systemd/system/fichas-sync.service >/dev/null <<'EOF'
 [Unit]
-Description=Fichas Metro sync (SharePoint)
+Description=Fichas de Medicao sync
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 EnvironmentFile=/etc/fichas-sync.env
-ExecStart=/usr/bin/node /home/ricardo/.openclaw/workspace/projects/fichas-metro/server/sync-server.mjs
+ExecStart=/usr/bin/node /home/ricardo/projetos/fichas-medicao/server/sync-server.mjs
 Restart=always
 RestartSec=5
 User=ricardo
@@ -146,13 +146,13 @@ Mesmo arquivo de ambiente, segundo serviço:
 ```bash
 sudo tee /etc/systemd/system/fichas-admin.service >/dev/null <<'EOF'
 [Unit]
-Description=Fichas Metro admin (cadastros)
+Description=Fichas de Medicao admin (cadastros)
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 EnvironmentFile=/etc/fichas-sync.env
-ExecStart=/usr/bin/node /home/ricardo/.openclaw/workspace/projects/fichas-metro/server/admin-server.mjs
+ExecStart=/usr/bin/node /home/ricardo/projetos/fichas-medicao/server/admin-server.mjs
 Restart=always
 RestartSec=5
 User=ricardo

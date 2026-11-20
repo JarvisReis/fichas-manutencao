@@ -4,7 +4,7 @@ import { extrairRgs } from './cadastros'
  * Janela de correção depois de concluir.
  *
  * Concluir não é cofre imediato: quem executou tem 24 horas para corrigir o que
- * digitou errado (número trocado, foto errada). Passada a janela — ou quando outra
+ * digitou errado (número trocado, equipe errada). Passada a janela — ou quando outra
  * pessoa tenta editar — a ficha fica com o administrador.
  */
 export const JANELA_CORRECAO_MS = 24 * 60 * 60 * 1000

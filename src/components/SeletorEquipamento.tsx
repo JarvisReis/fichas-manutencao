@@ -35,8 +35,9 @@ export default function SeletorEquipamento({ equipamentos, fichaId, valor, onSel
   }, [aberto])
 
   useEffect(() => {
-    if (aberto) setTimeout(() => campoBusca.current?.focus(), 50)
-    else setBusca('')
+    if (!aberto) return
+    const t = setTimeout(() => campoBusca.current?.focus(), 50)
+    return () => clearTimeout(t)
   }, [aberto])
 
   const semCadastro = lista.length === 0
@@ -45,7 +46,10 @@ export default function SeletorEquipamento({ equipamentos, fichaId, valor, onSel
     <div ref={caixa} className="relative">
       <button
         type="button"
-        onClick={() => setAberto((v) => !v)}
+        onClick={() => {
+          setBusca('')   // limpa ao abrir/fechar, em vez de fazer isso no efeito
+          setAberto((v) => !v)
+        }}
         className="flex w-full items-center gap-2 rounded-xl border-2 border-slate-300 bg-white px-3 py-3 text-left"
       >
         <span

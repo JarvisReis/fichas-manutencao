@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { AlertTriangle, Check, ChevronRight, Clock, CloudOff, LogIn, LogOut, NotebookPen, Database, HardDriveDownload, Menu, Moon, Search, ShieldCheck, Sun, Trash2, User as UserIcon, Users, Wifi, X } from 'lucide-react'
+import { AlertTriangle, Check, ChevronRight, Clock, CloudOff, KeyRound, LogIn, LogOut, NotebookPen, Database, HardDriveDownload, Menu, Moon, Search, ShieldCheck, Sun, Trash2, User as UserIcon, Users, Wifi, X } from 'lucide-react'
 import { db } from '../lib/db'
 import { validadeDoRascunho } from '../lib/permissoes'
 import { GRUPOS, grupoDaFicha } from '../config/fichas'
-import { lerEquipamentos, lerPessoas, normalizar, type Equipamento, type Pessoa } from '../lib/cadastros'
+import { lerEquipamentos, normalizar, type Equipamento } from '../lib/cadastros'
 import type { Sessao } from '../lib/sessao'
 import type { Execucao } from '../types'
 
@@ -19,6 +19,7 @@ interface Props {
   onVerHistorico: () => void
   onVerBackup: () => void
   onVerCadastros: () => void
+  onTrocarSenha: () => void
   onAlternarTema: () => void
   temaEscuro: boolean
   online: boolean
@@ -40,6 +41,7 @@ export default function TelaHome({
   onVerHistorico,
   onVerBackup,
   onVerCadastros,
+  onTrocarSenha,
   onAlternarTema,
   temaEscuro,
   online,
@@ -101,9 +103,11 @@ export default function TelaHome({
   }, [todas])
 
   const [menuAberto, setMenuAberto] = useState(false)
+  // referência de tempo estável: Date.now() no render quebra a pureza do componente
+  const [agora] = useState(() => Date.now())
   /**
    * Rascunho que o administrador mandou apagar. A exclusão é só local: rascunho
-   * não foi publicado, então não há linha no SharePoint a apagar.
+   * não foi enviado, então não há linha no servidor a apagar.
    */
   const [rascunhoApagando, setRascunhoApagando] = useState<{ id: string; nome: string } | null>(null)
 
@@ -115,8 +119,6 @@ export default function TelaHome({
    * vendo é o tipo de rodeio que faz ninguém usar.
    */
   const apagarRascunho = async (id: string) => {
-    const fotos = await db.fotos.where('execucaoId').equals(id).toArray()
-    for (const f of fotos) await db.fotos.delete(f.id)
     await db.execucoes.delete(id)
     setRascunhoApagando(null)
   }
@@ -174,6 +176,15 @@ export default function TelaHome({
   }, [ultimas, grupo])
 
   /**
+   * "Rascunho" só existe na lista quando há rascunho aberto no grupo da aba.
+   * Sem essa checagem a home abria em `caixa='rascunho'` num grupo sem
+   * rascunho: a etiqueta some, mas o estado continua apontando para ela e a
+   * tela fica vazia — nenhum rascunho, nenhum recente.
+   */
+  const caixaVisivel =
+    caixa === 'rascunho' && rascunhosDoGrupo.length === 0 ? 'recente' : caixa
+
+  /**
    * Os três equipamentos com manutenção mais antiga — os que estão devendo
    * serviço. É a leitura inversa do topo da lista: o que está há mais tempo sem
    * atendimento. Rascunho não entra (não é manutenção encerrada).
@@ -204,26 +215,30 @@ export default function TelaHome({
 
   const [busca, setBusca] = useState('')
   const [equipamentos, setEquipamentos] = useState<Equipamento[]>([])
-  const [pessoas, setPessoas] = useState<Pessoa[]>([])
-
-  // Banco zerado (aparelho novo, ou dados do site limpos): ninguém consegue
-  // entrar como administrador, porque administrador é uma pessoa cadastrada.
-  // Sem esta saída o app nasce trancado — a tela de cadastros exige sessão de
-  // administrador, e o menu escondia o único caminho até ela.
-  const precisaPrimeiroCadastro = !ehAdministrador && pessoas.length === 0
 
   // Cadastros podem ser editados em outra tela: recarrega ao abrir e ao voltar.
   useEffect(() => {
     const carregar = () => {
       void lerEquipamentos().then(setEquipamentos)
-      void lerPessoas().then(setPessoas)
     }
     carregar()
     const aoVoltar = () => {
       if (document.visibilityState === 'visible') carregar()
     }
     document.addEventListener('visibilitychange', aoVoltar)
-    return () => document.removeEventListener('visibilitychange', aoVoltar)
+    /**
+     * Aviso de "chegou coisa nova do servidor".
+     *
+     * Abrir o app num aparelho novo dispara o download do histórico, mas ele
+     * termina DEPOIS desta montagem — a home já tinha lido a lista vazia e
+     * continuava dizendo "nenhum equipamento cadastrado" até alguém recarregar.
+     * `App` emite este evento ao fim da sincronização; aqui só relemos.
+     */
+    window.addEventListener('fichas:sincronizado', carregar)
+    return () => {
+      document.removeEventListener('visibilitychange', aoVoltar)
+      window.removeEventListener('fichas:sincronizado', carregar)
+    }
   }, [])
 
   const filtrados = useMemo(() => {
@@ -342,13 +357,31 @@ export default function TelaHome({
                   }}
                 />
               )}
-              {(ehAdministrador || precisaPrimeiroCadastro) && (
+              {/*
+                * Só administrador vê cadastros. Antes o item também aparecia
+                * para o técnico quando a lista local de pessoas estava vazia
+                * ("Primeiro cadastro") — e ele não pode cadastrar nada, então
+                * era uma porta que só dava erro. Lista vazia no aparelho do
+                * técnico agora significa falha de sincronização, não convite
+                * para cadastrar.
+                */}
+              {ehAdministrador && (
                 <MenuItem
                   icone={<Users size={18} />}
-                  rotulo={ehAdministrador ? 'Equipe e equipamentos' : 'Primeiro cadastro'}
+                  rotulo="Equipe e equipamentos"
                   onClick={() => {
                     setMenuAberto(false)
                     onVerCadastros()
+                  }}
+                />
+              )}
+              {sessao && (
+                <MenuItem
+                  icone={<KeyRound size={18} />}
+                  rotulo="Trocar minha senha"
+                  onClick={() => {
+                    setMenuAberto(false)
+                    onTrocarSenha()
                   }}
                 />
               )}
@@ -435,7 +468,7 @@ export default function TelaHome({
                 key={c.id}
                 onClick={() => setCaixa(c.id)}
                 className={`rounded-xl px-2 py-2 text-[11px] font-semibold leading-tight transition ${
-                  caixa === c.id ? `${c.cor} text-white` : 'bg-slate-100 text-slate-600'
+                  caixaVisivel === c.id ? `${c.cor} text-white` : 'bg-slate-100 text-slate-600'
                 }`}
               >
                 {c.rotulo}
@@ -443,7 +476,7 @@ export default function TelaHome({
             ))}
           </div>
 
-          {!sessao || caixa !== 'recente' ? null : equipamentos.filter((e) => grupoDaFicha(e.fichaId) === grupo).length === 0 ? (
+          {!sessao || caixaVisivel !== 'recente' ? null : equipamentos.filter((e) => grupoDaFicha(e.fichaId) === grupo).length === 0 ? (
             <div className="rounded-2xl border-2 border-dashed border-slate-300 p-4">
               <p className="text-xs text-slate-600">
                 Nenhum equipamento de <strong>{GRUPOS.find((g) => g.id === grupo)?.rotulo}</strong>{' '}
@@ -527,7 +560,7 @@ export default function TelaHome({
         </section>
         )}
 
-        {sessao && caixa === 'prioridade' && maisAntigos.length === 0 && (
+        {sessao && caixaVisivel === 'prioridade' && maisAntigos.length === 0 && (
           <section>
             <p className="rounded-xl bg-slate-100 p-3 text-xs text-slate-600">
               Nenhum equipamento de {GRUPOS.find((g) => g.id === grupo)?.rotulo} com manutenção
@@ -536,7 +569,7 @@ export default function TelaHome({
           </section>
         )}
 
-        {sessao && caixa === 'prioridade' && maisAntigos.length > 0 && (
+        {sessao && caixaVisivel === 'prioridade' && maisAntigos.length > 0 && (
           <section>
             <h2 className="mb-2 px-1 text-xs font-bold tracking-wide text-slate-500 uppercase">
               Tempo sem manutenção
@@ -551,7 +584,7 @@ export default function TelaHome({
                 const quando = new Date(exec.dataHora)
                 const meses = Math.max(
                   0,
-                  Math.floor((Date.now() - quando.getTime()) / (1000 * 60 * 60 * 24 * 30.44)),
+                  Math.floor((agora - quando.getTime()) / (1000 * 60 * 60 * 24 * 30.44)),
                 )
                 return (
                   <button
@@ -595,7 +628,7 @@ export default function TelaHome({
           </section>
         )}
 
-        {sessao && caixa === 'rascunho' && ultimas && ultimas.length > 0 && (
+        {sessao && caixaVisivel === 'rascunho' && ultimas && ultimas.length > 0 && (
           <section>
             <div className="space-y-2 px-1">
               {rascunhosDoGrupo.map(({ exec, total }) => {
@@ -685,8 +718,8 @@ export default function TelaHome({
             <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-xl">
               <h2 className="text-base font-bold text-slate-900">Excluir rascunho?</h2>
               <p className="mt-2 text-sm text-slate-600">
-                O rascunho de <strong>{rascunhoApagando.nome}</strong> será apagado deste aparelho,
-                incluindo as fotos. O que já foi medido se perde.
+                O rascunho de <strong>{rascunhoApagando.nome}</strong> será apagado deste aparelho.
+                O que já foi medido se perde.
               </p>
               <div className="mt-4 flex gap-2">
                 <button

@@ -22,7 +22,31 @@ describe('marca única: Sechéron', () => {
   it('ignora lixo e vazio', () => {
     expect(normalizarMarca('')).toBeUndefined()
     expect(normalizarMarca(undefined)).toBeUndefined()
-    expect(normalizarMarca('SECHERON')).toBeUndefined()
+    expect(normalizarMarca('outra marca qualquer')).toBeUndefined()
+  })
+
+  it('aceita a marca em qualquer caixa', () => {
+    // O próprio app já gravou `Secheron` com maiúscula no servidor. Se isso
+    // voltar `undefined`, o item perde o limite próprio sem avisar.
+    expect(normalizarMarca('SECHERON')).toBe('secheron')
+    expect(normalizarMarca('Secheron')).toBe('secheron')
+    expect(normalizarMarca('secheron')).toBe('secheron')
+    expect(normalizarMarca('  SECHERON  ')).toBe('secheron')
+  })
+
+  it('aceita a marca com acento, como o nome exibido', () => {
+    expect(normalizarMarca('Sechéron')).toBe('secheron')
+    expect(normalizarMarca('SÉCHERON')).toBe('secheron')
+  })
+
+  it('aceita erro de digitação conhecido de cadastro', () => {
+    // O equipamento CLI-CT02 foi cadastrado como `Scheron` (sem o "e").
+    expect(normalizarMarca('Scheron')).toBe('secheron')
+  })
+
+  it('não inventa marca a partir de texto vazio ou espaços', () => {
+    expect(normalizarMarca('   ')).toBeUndefined()
+    expect(normalizarMarca(null)).toBeUndefined()
   })
 
   it('limite de Cabos X Barramentos é 15 µΩ para qualquer marca', () => {

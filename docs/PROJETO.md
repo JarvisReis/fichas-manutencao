@@ -1,4 +1,4 @@
-# Projeto — App Fichas Metrô
+# Projeto — Fichas de Medição
 
 PWA offline-first para as fichas de medição de contator e seccionador, usada em
 campo pelos técnicos. Este documento é o mapa mínimo para alguém assumir o
@@ -7,7 +7,7 @@ projeto sem redescobrir o caminho.
 ## Onde as coisas vivem
 
 ```
-projects/fichas-metro        código (subdiretório do repositório PiJarvis)
+/home/ricardo/projetos/fichas-medicao     código (repositório próprio)
   src/pages                  telas (TelaHome, TelaExecucao, TelaCadastros, ...)
   src/lib                    regras de negócio + acesso a dados (Dexie, sync, PDF)
   src/components             componentes compartilhados
