@@ -7,7 +7,7 @@ projeto sem redescobrir o caminho.
 ## Onde as coisas vivem
 
 ```
-/home/ricardo/projetos/fichas-medicao     código (repositório próprio)
+/home/ricardo/projetos/fichas-manutencao   código (repositório próprio)
   src/pages                  telas (TelaHome, TelaExecucao, TelaCadastros, ...)
   src/lib                    regras de negócio + acesso a dados (Dexie, sync, PDF)
   src/components             componentes compartilhados
