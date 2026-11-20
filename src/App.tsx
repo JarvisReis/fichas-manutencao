@@ -18,6 +18,7 @@ import { useSessao } from './lib/sessao'
 import SeletorSessao from './components/SeletorSessao'
 import TelaHome from './pages/TelaHome'
 import TelaIdentificacao from './pages/TelaIdentificacao'
+import Manual from './pages/Manual'
 import TelaExecucao from './pages/TelaExecucao'
 import TelaHistorico from './pages/TelaHistorico'
 import TelaBackup from './pages/TelaBackup'
@@ -34,6 +35,7 @@ type Rota =
   | { nome: 'execucao'; ficha: DefinicaoFicha; execucao: Execucao }
   | { nome: 'historico' }
   | { nome: 'backup' }
+  | { nome: 'manual' }
   | { nome: 'recuperacao' }
   /** `aba` abre os cadastros já na seção pedida (ex.: editor de ficha). */
   | { nome: 'cadastros'; aba?: 'equipe' | 'equipamentos' | 'fichas' }
@@ -55,7 +57,7 @@ type Rota =
  * para a home e ele tinha que achar o equipamento outra vez — o pior momento
  * possível, porque a ficha estava pela metade.
  */
-const ROTAS_NA_URL = new Set(['historico', 'backup', 'recuperacao', 'cadastros'])
+const ROTAS_NA_URL = new Set(['historico', 'backup', 'recuperacao', 'cadastros', 'manual'])
 const ROTAS_COM_ID = new Set(['identificacao', 'execucao', 'ficha'])
 
 /** Hash da rota, ou '' para a home. */
@@ -726,6 +728,7 @@ export default function App() {
             onAbrirExecucao={(id) => void abrirExecucao(id)}
             onVerHistorico={() => setRota({ nome: 'historico' })}
             onVerBackup={() => setRota({ nome: 'backup' })}
+            onVerManual={() => setRota({ nome: 'manual' })}
             onVerCadastros={() => setRota({ nome: 'cadastros' })}
             onTrocarSenha={() => setRota({ nome: 'senha' })}
             onAlternarTema={alternar}
@@ -743,6 +746,9 @@ export default function App() {
 
     case 'senha':
       return <TelaSenha onVoltar={() => setRota({ nome: 'home' })} />
+
+    case 'manual':
+      return <Manual onVoltar={() => setRota({ nome: 'home' })} />
 
     case 'backup':
       return (
@@ -883,6 +889,7 @@ export default function App() {
           onAbrirExecucao={(id) => void abrirExecucao(id)}
           onVerHistorico={() => setRota({ nome: 'historico' })}
           onVerBackup={() => setRota({ nome: 'backup' })}
+          onVerManual={() => setRota({ nome: 'manual' })}
           onVerCadastros={() => setRota({ nome: 'cadastros' })}
           onTrocarSenha={() => setRota({ nome: 'senha' })}
           onAlternarTema={alternar}

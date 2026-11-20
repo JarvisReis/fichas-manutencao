@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { AlertTriangle, Check, ChevronRight, Clock, CloudOff, KeyRound, LogIn, LogOut, NotebookPen, Database, HardDriveDownload, Menu, Moon, Search, ShieldCheck, Sun, Trash2, User as UserIcon, Users, Wifi, X } from 'lucide-react'
+import { AlertTriangle, BookOpen, Check, ChevronRight, Clock, CloudOff, KeyRound, LogIn, LogOut, NotebookPen, Database, HardDriveDownload, Menu, Moon, Search, ShieldCheck, Sun, Trash2, User as UserIcon, Users, Wifi, X } from 'lucide-react'
 import { db } from '../lib/db'
 import { podeApagarRascunho, validadeDoRascunho } from '../lib/permissoes'
 import { GRUPOS, grupoDaFicha } from '../config/fichas'
@@ -18,6 +18,7 @@ interface Props {
   onAbrirExecucao: (id: string) => void
   onVerHistorico: () => void
   onVerBackup: () => void
+  onVerManual: () => void
   onVerCadastros: () => void
   onTrocarSenha: () => void
   onAlternarTema: () => void
@@ -40,6 +41,7 @@ export default function TelaHome({
   onAbrirExecucao,
   onVerHistorico,
   onVerBackup,
+  onVerManual,
   onVerCadastros,
   onTrocarSenha,
   onAlternarTema,
@@ -357,6 +359,20 @@ export default function TelaHome({
                   }}
                 />
               )}
+              {/**
+                * Manual fica fora do bloco acima de propósito: quem ainda não
+                * entrou também precisa dele. É a primeira coisa que o técnico
+                * novo procura, e pedir login para ler como usar é atrito sem
+                * motivo — o manual é só leitura.
+                */}
+              <MenuItem
+                icone={<BookOpen size={18} />}
+                rotulo="Manual de uso"
+                onClick={() => {
+                  setMenuAberto(false)
+                  onVerManual()
+                }}
+              />
               {/*
                 * Só administrador vê cadastros. Antes o item também aparecia
                 * para o técnico quando a lista local de pessoas estava vazia
