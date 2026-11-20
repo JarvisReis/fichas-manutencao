@@ -525,6 +525,28 @@ export default function TelaIdentificacao({
                 <button
                   key={tipo}
                   onClick={() => {
+                    /**
+                     * Trocar para P2 muda o significado do núcleo.
+                     *
+                     * A ficha nasce como P1, e como P1 o campo "instalado" já vem
+                     * preenchido com o núcleo da manutenção anterior. Se o
+                     * técnico então escolhe P2, esse núcleo não é o que entra —
+                     * é o que SAI. Sem esta troca, a P2 abria com o núcleo velho
+                     * no campo do novo e o retirado vazio, exatamente ao
+                     * contrário da regra.
+                     */
+                    if (tipo === 'P2' && tipoManutencao !== 'P2') {
+                      const emUso = nucleoInstalado.trim()
+                      if (emUso && !nucleoRetirado.trim()) {
+                        setNucleoRetirado(emUso)
+                        setNucleoInstalado('')
+                        setNucleoAnteriorConhecido(true)
+                        salvarCampos({
+                          nucleoInstalado: '',
+                          camposFixos: { ...camposFixos, serieRetirado: emUso },
+                        })
+                      }
+                    }
                     setTipoManutencao(tipo)
                     setTipoEscolhido(true)
                     salvarCampos({ tipoManutencao: tipo })
