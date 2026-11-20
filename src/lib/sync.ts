@@ -18,7 +18,15 @@ import type { DefinicaoFicha, Execucao, Marca } from '../types'
 export type ResultadoExportado = 'conforme' | 'nao_conforme' | 'na'
 
 export const FORMATO_ENVIO = 'fichas-execucao'
-export const VERSAO_ENVIO = 3
+/**
+ * Contrato do envio.
+ *
+ * v4 (2026-11-20): passa a mandar `camposFixos` inteiro. Até a v3 só o nome do
+ * equipamento subia, então equipe (rg1..rg6), patrimônios dos instrumentos e a
+ * série do núcleo retirado nunca chegavam ao servidor — a ficha voltava
+ * incompleta no outro aparelho.
+ */
+export const VERSAO_ENVIO = 4
 
 /**
  * Quantas fichas o `/historico` traz por vez.
@@ -41,6 +49,11 @@ export interface ExecucaoExportada {
   fichaId: string
   fichaNome: string
   equipamento: string
+  /**
+   * Campos fixos completos — equipe, patrimônios dos instrumentos, série do
+   * núcleo retirado. O servidor guarda em jsonb e devolve inteiro.
+   */
+  camposFixos: Record<string, string>
   marca?: string
   tipoManutencao?: string
   nucleoInstalado?: string
@@ -68,10 +81,15 @@ export interface ExecucaoExportada {
 }
 
 /** Monta o payload de uma execução pronta para envio. */
-export async function montarEnvio(execucaoId: string): Promise<ExecucaoExportada | null> {
-  const exec = await db.execucoes.get(execucaoId)
-  if (!exec) return null
-  const ficha = getFicha(exec.fichaId)
+/**
+ * Monta o payload de envio a partir de uma execução já em memória.
+ *
+ * Separado de `montarEnvio` (que lê o IndexedDB) para poder ser testado: o
+ * defeito que originou isto era silencioso — a ficha subia sem `camposFixos`,
+ * então equipe, patrimônios dos instrumentos e série do núcleo retirado
+ * existiam só no aparelho de quem preencheu.
+ */
+export function montarPayload(exec: Execucao, ficha: DefinicaoFicha | undefined): ExecucaoExportada {
   const valores = mapearValores(exec, ficha)
   const naoConformes = valores.filter((v) => v.resultado === 'nao_conforme').length
 
@@ -79,16 +97,12 @@ export async function montarEnvio(execucaoId: string): Promise<ExecucaoExportada
     formato: FORMATO_ENVIO,
     versao: VERSAO_ENVIO,
     id: exec.id,
-    /**
-     * O servidor lê `client_id` — é a chave de idempotência da tabela
-     * `execucoes`. Sem ela o envio volta 400 ("execução sem client_id") e a
-     * ficha nunca sai da fila, por mais que o técnico tente.
-     */
     client_id: exec.id,
     codigo: exec.codigo,
     fichaId: exec.fichaId,
     fichaNome: ficha?.nome ?? exec.fichaId,
     equipamento: exec.camposFixos.equipamento ?? '',
+    camposFixos: exec.camposFixos ?? {},
     marca: exec.marca,
     tipoManutencao: exec.tipoManutencao,
     nucleoInstalado: exec.nucleoInstalado || undefined,
@@ -104,6 +118,12 @@ export async function montarEnvio(execucaoId: string): Promise<ExecucaoExportada
     cabecalho: exec.cabecalho,
     valores,
   }
+}
+
+export async function montarEnvio(execucaoId: string): Promise<ExecucaoExportada | null> {
+  const exec = await db.execucoes.get(execucaoId)
+  if (!exec) return null
+  return montarPayload(exec, getFicha(exec.fichaId))
 }
 
 /**
@@ -390,7 +410,7 @@ function traduzirResultado(
 }
 
 function detectarAparelho(): string {
-  const ua = navigator.userAgent
+  const ua = typeof navigator === 'undefined' ? '' : navigator.userAgent
   if (/iPhone|iPad|iPod/.test(ua)) return 'iOS'
   if (/Android/.test(ua)) return 'Android'
   return 'Navegador'

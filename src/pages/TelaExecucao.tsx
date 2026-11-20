@@ -333,7 +333,12 @@ export default function TelaExecucao({
               {[
                 ['Núcleo instalado', execucao.nucleoInstalado || '—'],
                 ['Núcleo retirado', execucao.camposFixos.serieRetirado || '—'],
-                ['Tipo de manutenção', execucao.tipoManutencao || '—'],
+                /**
+                 * "Tipo de manutenção" saiu daqui: já aparece na Identificação,
+                 * e nesta ficha vinha em branco (o campo do cartão lia um dado
+                 * que só existia no cabeçalho), o que dava a impressão de
+                 * ficha incompleta.
+                 */
               ].map(([rotulo, valor]) => (
                 <div key={rotulo} className="min-w-0">
                   <dt className="text-[10px] font-semibold tracking-wide text-slate-500 uppercase">

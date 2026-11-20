@@ -168,14 +168,18 @@ async function baixarHistorico(quem, { desde, limite }) {
     fichaId: l.ficha_id,
     marca: l.marca ?? undefined,
     tipoManutencao: l.tipo_manutencao ?? undefined,
-    cabecalho: {},
-    camposFixos: {
-      equipamento: l.equipamento ?? '',
-      ...(l.rg1 ? { rg1: l.rg1 } : {}),
-      ...(l.rg2 ? { rg2: l.rg2 } : {}),
-      ...(l.serie_retirado ? { serieRetirado: l.serie_retirado } : {}),
-    },
+    /**
+     * Cabeçalho e campos fixos voltam inteiros.
+     *
+     * Antes o servidor só devolvia `equipamento` (e lia uma coluna
+     * `serie_retirado` que nunca existiu). Resultado: a ficha chegava no outro
+     * aparelho sem equipe, sem patrimônio dos instrumentos e sem núcleo
+     * retirado — completa só no aparelho de quem preencheu.
+     */
+    cabecalho: l.cabecalho ?? {},
+    camposFixos: camposFixosDoServidor(l),
     nucleoInstalado: l.nucleo_instalado ?? undefined,
+    nucleoRetirado: l.nucleo_retirado ?? undefined,
     local: l.local ?? '',
     dataHora: l.data_hora,
     dataFim: l.data_fim ?? undefined,
@@ -312,8 +316,23 @@ async function gravarExecucao(quem, p) {
      * aparelho recebia a execução sem saber quem a fez. Aceitar as duas formas
      * conserta também as fichas já gravadas, na próxima vez que subirem.
      */
-    rg1: p.rg1 ?? p.cabecalho?.rg1 ?? null,
-    rg2: p.rg2 ?? p.cabecalho?.rg2 ?? null,
+    rg1: p.rg1 ?? p.camposFixos?.rg1 ?? p.cabecalho?.rg1 ?? null,
+    rg2: p.rg2 ?? p.camposFixos?.rg2 ?? p.cabecalho?.rg2 ?? null,
+    rg3: p.rg3 ?? p.camposFixos?.rg3 ?? p.cabecalho?.rg3 ?? null,
+    rg4: p.rg4 ?? p.camposFixos?.rg4 ?? p.cabecalho?.rg4 ?? null,
+    rg5: p.rg5 ?? p.camposFixos?.rg5 ?? p.cabecalho?.rg5 ?? null,
+    rg6: p.rg6 ?? p.camposFixos?.rg6 ?? p.cabecalho?.rg6 ?? null,
+    /**
+     * Cabeçalho e campos fixos inteiros, em jsonb.
+     *
+     * Antes só existiam as colunas soltas — e o app guarda a equipe e os
+     * patrimônios dos instrumentos em `camposFixos`, que simplesmente não era
+     * enviado. A ficha subia sem equipe e voltava sem equipe para o outro
+     * aparelho; o mesmo serviço aparecia completo no celular de quem preencheu
+     * e faltando no do administrador.
+     */
+    cabecalho: p.cabecalho && typeof p.cabecalho === 'object' ? p.cabecalho : {},
+    campos_fixos: p.camposFixos && typeof p.camposFixos === 'object' ? p.camposFixos : {},
     criada_por: quem.id,
     atualizada_em: new Date().toISOString(),
   }
@@ -545,6 +564,31 @@ async function gravarAjustesDeFichas(quem, dados) {
    * dele sem necessidade.
    */
   return { ok: true, atualizadoEm: agora, atualizadoPor: quem.id, autor: quem.nome ?? null }
+}
+
+/**
+ * Campos fixos de uma linha do banco, para o formato que o app usa.
+ *
+ * Junta duas origens para não depender da versão do app que gravou:
+ *  - `campos_fixos` (jsonb, cheio a partir do contrato v4) — equipe rg1..rg6,
+ *    patrimônios dos instrumentos, série do núcleo retirado;
+ *  - as colunas soltas (`equipamento`, `rg1`..`rg6`, `nucleo_retirado`), que
+ *    existiam antes e continuam sendo gravadas.
+ *
+ * O que veio no jsonb manda; as colunas só preenchem o que faltar. Ficha
+ * gravada antes da v4 tem jsonb vazio e volta com o que as colunas guardavam.
+ */
+function camposFixosDoServidor(l) {
+  const doJson = l.campos_fixos && typeof l.campos_fixos === 'object' ? l.campos_fixos : {}
+  const campos = { ...doJson }
+  if (!campos.equipamento && l.equipamento) campos.equipamento = l.equipamento
+  for (const chave of ['rg1', 'rg2', 'rg3', 'rg4', 'rg5', 'rg6']) {
+    if (!campos[chave] && l[chave]) campos[chave] = l[chave]
+  }
+  // Núcleo retirado mora em `nucleo_retirado`, não em campos fixos; a tela lê
+  // de `camposFixos.serieRetirado`, então os dois nomes precisam existir.
+  if (!campos.serieRetirado && l.nucleo_retirado) campos.serieRetirado = l.nucleo_retirado
+  return campos
 }
 
 function json(res, status, dados) {

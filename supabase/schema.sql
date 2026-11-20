@@ -291,3 +291,19 @@ alter table public.configuracoes enable row level security;
 -- que subiu); este índice é a garantia no banco, não só na aplicação.
 -- ---------------------------------------------------------------------------
 create unique index if not exists execucoes_codigo_unico on public.execucoes (upper(codigo));
+
+-- ---------------------------------------------------------------------------
+-- CAMPOS FIXOS E CABEÇALHO INTEIROS
+--
+-- O app guarda equipe (rg1..rg6), patrimônios dos instrumentos e a série do
+-- núcleo retirado em `camposFixos`. Até o contrato v3 isso NÃO era enviado: só
+-- o nome do equipamento subia, e as colunas soltas rg1/rg2 nunca eram
+-- preenchidas. A ficha ficava completa no aparelho de quem preencheu e
+-- incompleta em todos os outros.
+-- ---------------------------------------------------------------------------
+alter table public.execucoes add column if not exists campos_fixos jsonb not null default '{}'::jsonb;
+alter table public.execucoes add column if not exists cabecalho jsonb not null default '{}'::jsonb;
+alter table public.execucoes add column if not exists rg3 text;
+alter table public.execucoes add column if not exists rg4 text;
+alter table public.execucoes add column if not exists rg5 text;
+alter table public.execucoes add column if not exists rg6 text;
