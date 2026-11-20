@@ -11,7 +11,7 @@ async function baixarPdfRelatorio(args: Parameters<typeof import('./lib/pdfRelat
 }
 import { baixarAjustesDeFichas, baixarEquipe, baixarEquipamentos, baixarHistorico, enviarBackupAutomatico, enviarEquipamentos, enviarExecucao, publicarAjustesDeFichas, sincronizarPendentes } from './lib/sync'
 import { definirFichasEmVigor, getFicha } from './config/fichas'
-import { deveAplicarRemoto, fichasEmVigor, gravarFichasAjustadas, gravarVersaoAplicada, lerFichasAjustadas, lerPublicacaoPendente, lerVersaoAplicada, marcarPublicacaoPendente } from './lib/fichasEditadas'
+import { deveAplicarRemoto, fichasEmVigor, gravarAutorPublicacao, gravarFichasAjustadas, gravarVersaoAplicada, lerFichasAjustadas, lerPublicacaoPendente, lerVersaoAplicada, marcarPublicacaoPendente } from './lib/fichasEditadas'
 import { chaveDoEquipamento, gravarEquipamentos, gravarPessoas, lerEquipamentos, lerPessoas, type Equipamento, type Pessoa } from './lib/cadastros'
 import { identificacaoCompleta, podeEditarExecucao } from './lib/permissoes'
 import { useSessao } from './lib/sessao'
@@ -274,6 +274,7 @@ export default function App() {
       if (baixados.dados.atualizadoEm) {
         await gravarVersaoAplicada(baixados.dados.atualizadoEm).catch(() => undefined)
       }
+      await gravarAutorPublicacao(baixados.dados.autor ?? null).catch(() => undefined)
       // A tela de execução já acha a ficha nova sem recarregar.
       definirFichasEmVigor(fichasEmVigor(baixados.dados.ajustes))
     }

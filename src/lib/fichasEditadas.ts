@@ -81,6 +81,7 @@ export const TIPOS_ITEM_VALIDOS = ['texto', 'numero', 'lista'] as const
  */
 const CHAVE_REMOTO = 'cadastro:fichasEm'
 const CHAVE_PENDENTE = 'cadastro:fichasPendente'
+const CHAVE_AUTOR = 'cadastro:fichasAutor'
 
 export async function lerVersaoAplicada(): Promise<string | null> {
   const registro = await db.config.get(CHAVE_REMOTO)
@@ -89,6 +90,21 @@ export async function lerVersaoAplicada(): Promise<string | null> {
 
 export const gravarVersaoAplicada = (carimbo: string) =>
   db.config.put({ chave: CHAVE_REMOTO, valor: carimbo })
+
+export const gravarAutorPublicacao = (autor: string | null) =>
+  db.config.put({ chave: CHAVE_AUTOR, valor: autor ?? '' })
+
+/**
+ * Quem publicou a versão em vigor e quando.
+ *
+ * A tela mostra isso junto do editor: limite revisado sem assinatura e sem data
+ * não serve para auditoria, e o técnico precisa saber que está medindo pela
+ * régua de outra pessoa — e de quando.
+ */
+export async function lerPublicacaoDeFichas(): Promise<{ autor: string | null; em: string | null }> {
+  const [autor, em] = await Promise.all([db.config.get(CHAVE_AUTOR), db.config.get(CHAVE_REMOTO)])
+  return { autor: autor?.valor || null, em: em?.valor || null }
+}
 
 export async function lerPublicacaoPendente(): Promise<boolean> {
   const registro = await db.config.get(CHAVE_PENDENTE)

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ChevronDown, Check, FileDown, Infinity as Inf, Plus, Save, X } from 'lucide-react'
 import { NOME_MARCA, type DefinicaoFicha, type Execucao, type Marca, type ValorItem } from '../types'
 import { avaliarItem } from '../lib/conformidade'
+import { avisoDeRevisao, revisaoDeLimite } from '../lib/limiteRevogado'
 import { lerPessoas } from '../lib/cadastros'
 async function baixarPdfRelatorio(args: Parameters<typeof import('../lib/pdfRelatorio')['baixarPdfRelatorio']>[0]) {
   const mod = await import('../lib/pdfRelatorio')
@@ -134,10 +135,26 @@ export default function TelaExecucao({
 
   const definirValor = (itemId: string, valor: string) => {
     const existe = valores.some((v) => v.itemId === itemId)
+    /**
+     * Grava junto o limite em vigor no instante da medição.
+     *
+     * Sem esse retrato, uma revisão posterior do limite faria a medição antiga
+     * parecer conforme por uma régua que já não vale — e não haveria como
+     * descobrir isso depois. O retrato é do que valia então, não do que vale
+     * agora: é justamente o que permite acusar a diferença.
+     */
+    const item = ficha.itens.find((i) => i.id === itemId)
+    const retrato: Partial<ValorItem> = item
+      ? {
+          limiteUsado: Number.isFinite(item.limite) ? item.limite : undefined,
+          direcaoUsada: item.direcao,
+          unidadeUsada: item.unidade,
+        }
+      : {}
     aplicarValores(
       existe
-        ? valores.map((v) => (v.itemId === itemId ? { ...v, valor } : v))
-        : [...valores, { itemId, valor }],
+        ? valores.map((v) => (v.itemId === itemId ? { ...v, valor, ...retrato } : v))
+        : [...valores, { itemId, valor, ...retrato }],
     )
   }
 
@@ -349,6 +366,10 @@ export default function TelaExecucao({
           const analise = avaliarItem(item, valorDe(item.id), marca)
           const cores = corResultado[analise.resultado]
           const posicao = comCampo.indexOf(item.id)
+          const revisao = revisaoDeLimite(
+            valores.find((v) => v.itemId === item.id),
+            item,
+          )
 
           return (
             <section
@@ -369,6 +390,12 @@ export default function TelaExecucao({
               <p className="mt-2 mb-2 text-xs font-semibold text-slate-700">
                 Procedimento: {analise.limiteExibido}
               </p>
+
+              {revisao.revogado && (
+                <p className="mb-2 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-[11px] font-semibold leading-snug text-amber-900">
+                  {avisoDeRevisao(revisao, item.unidade)}
+                </p>
+              )}
 
               {analise.resultado === 'na' ? (
                 <p className="rounded-xl bg-white/70 p-3 text-sm text-slate-600">

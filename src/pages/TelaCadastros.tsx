@@ -4,9 +4,12 @@ import { FICHAS, definirFichasEmVigor, getFicha } from '../config/fichas'
 import EditorFichas from './EditorFichas'
 import {
   fichasEmVigor,
+  gravarAutorPublicacao,
   gravarFichasAjustadas,
   gravarVersaoAplicada,
   lerFichasAjustadas,
+  lerPublicacaoDeFichas,
+  lerPublicacaoPendente,
   marcarPublicacaoPendente,
   type FichasAjustadas,
 } from '../lib/fichasEditadas'
@@ -46,6 +49,17 @@ export default function TelaCadastros({ onVoltar, administrador, abaInicial }: P
   const [equipamentos, setEquipamentos] = useState<Equipamento[]>([])
   const [pessoas, setPessoas] = useState<Pessoa[]>([])
   const [ajustesFichas, setAjustesFichas] = useState<FichasAjustadas>({})
+  /**
+   * Quem publicou a versão em vigor das fichas.
+   *
+   * Limite de medição revisado sem autor e sem data não passa em auditoria: o
+   * técnico tem que poder ver de quem é a régua que ele está usando.
+   */
+  const [publicacao, setPublicacao] = useState<{ autor: string | null; em: string | null }>({
+    autor: null,
+    em: null,
+  })
+  const [publicacaoPendente, setPublicacaoPendente] = useState(false)
   const [carregado, setCarregado] = useState(false)
 
   useEffect(() => {
@@ -53,6 +67,8 @@ export default function TelaCadastros({ onVoltar, administrador, abaInicial }: P
       setEquipamentos(await lerEquipamentos())
       setPessoas(await lerPessoas())
       setAjustesFichas(await lerFichasAjustadas())
+      setPublicacao(await lerPublicacaoDeFichas())
+      setPublicacaoPendente(await lerPublicacaoPendente())
       setCarregado(true)
     })()
   }, [])
@@ -140,12 +156,17 @@ export default function TelaCadastros({ onVoltar, administrador, abaInicial }: P
     const envio = await publicarAjustesDeFichas(obterEndpointAdmin(), ajustes)
     if (envio.ok) {
       await marcarPublicacaoPendente(false)
+      setPublicacaoPendente(false)
+      const em = envio.atualizadoEm ?? new Date().toISOString()
       if (envio.atualizadoEm) await gravarVersaoAplicada(envio.atualizadoEm)
+      await gravarAutorPublicacao(envio.autor ?? null)
+      setPublicacao({ autor: envio.autor ?? publicacao.autor, em })
       setAvisoEnvio({
         erro: false,
         texto: 'Ficha publicada para a equipe — os outros aparelhos recebem na próxima sincronização.',
       })
     } else {
+      setPublicacaoPendente(true)
       setAvisoEnvio({
         erro: true,
         texto: `Ficha salva neste aparelho. Publicação pendente (${envio.erro ?? 'sem rede'}).`,
@@ -233,11 +254,54 @@ export default function TelaCadastros({ onVoltar, administrador, abaInicial }: P
         ) : aba === 'equipamentos' ? (
           <EditorEquipamentos equipamentos={equipamentos} onSalvar={salvarEquipamentos} />
         ) : (
-          <EditorFichas ajustes={ajustesFichas} onSalvar={salvarFichas} />
+          <>
+            <div
+              className={`mb-3 rounded-xl border px-3 py-2 text-[11px] leading-relaxed ${
+                publicacaoPendente
+                  ? 'border-amber-300 bg-amber-50 text-amber-900'
+                  : 'border-slate-200 bg-slate-50 text-slate-600'
+              }`}
+            >
+              {publicacaoPendente ? (
+                <span className="font-semibold">
+                  Há alteração salva neste aparelho que ainda não foi publicada para a equipe.
+                </span>
+              ) : publicacao.em ? (
+                <>
+                  <span className="font-semibold text-slate-800">Versão em vigor</span> publicada por{' '}
+                  <span className="font-semibold">{publicacao.autor || 'administrador'}</span> em{' '}
+                  {dataHoraCurta(publicacao.em)}.
+                </>
+              ) : (
+                <>
+                  Nenhuma revisão publicada ainda — todas as fichas seguem o padrão do aplicativo.
+                </>
+              )}
+            </div>
+            <EditorFichas ajustes={ajustesFichas} onSalvar={salvarFichas} />
+          </>
         )}
       </div>
     </div>
   )
+}
+
+/**
+ * Data curta no fuso do aparelho.
+ *
+ * O carimbo da publicação vem em UTC. Mostrar o ISO cru obrigaria o técnico a
+ * fazer conta de fuso para saber quando o limite dele foi revisado.
+ */
+function dataHoraCurta(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 /* ------------------------------- Funcionários ------------------------------ */

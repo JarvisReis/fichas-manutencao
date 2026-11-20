@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf'
 import { NOME_MARCA, type DefinicaoFicha, type Execucao, type ItemFicha } from '../types'
 import { avaliarItem, parseValor } from './conformidade'
+import { avisoDeRevisao, revisaoDeLimite } from './limiteRevogado'
 
 /**
  * Relatório da ficha em PDF, para arquivar/entregar.
@@ -459,6 +460,41 @@ export function gerarPdfRelatorio(
       doc.text(pedaco, margem, y)
       y += 4.4
     }
+  }
+
+  // ---- Limites revisados depois da medição
+  /**
+   * O documento tem que contar a história certa.
+   *
+   * Uma medição feita com limite 15 pode estar "conforme" hoje por um limite 12
+   * que ninguém usou na hora. Sem esta seção, o PDF arquivado mente por omissão
+   * — e é justamente o documento que vai para auditoria.
+   */
+  const revisoes = ficha.itens
+    .map((item) => ({
+      item,
+      revisao: revisaoDeLimite(
+        execucao.valores.find((v) => v.itemId === item.id),
+        item,
+      ),
+    }))
+    .filter((r) => r.revisao.revogado)
+
+  if (revisoes.length > 0) {
+    tituloSecao('Limites revisados')
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8.5)
+    doc.setTextColor(146, 64, 14)
+    for (const { item, revisao } of revisoes) {
+      const texto = textoPdf(`${item.nome}: ${avisoDeRevisao(revisao, item.unidade)}`, simbolos)
+      fonte(doc, texto, 'normal', simbolos)
+      for (const pedaco of doc.splitTextToSize(texto, largura)) {
+        quebrar()
+        doc.text(pedaco, margem, y)
+        y += 4.2
+      }
+    }
+    doc.setTextColor(15, 23, 42)
   }
 
   // ---- Rodapé em todas as páginas

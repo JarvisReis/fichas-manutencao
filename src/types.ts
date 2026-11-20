@@ -122,6 +122,18 @@ export interface ValorItem {
   /** string crua digitada ("∞" é válido) */
   valor: string
   observacao?: string
+  /**
+   * Limite e direção que valiam no instante da medição.
+   *
+   * O administrador pode revisar um limite depois — e aí a medição antiga
+   * passa a parecer "conforme" por uma régua que não existe mais. Guardar o
+   * valor usado permite marcar no app e no PDF que a régua mudou, sem
+   * reescrever o que foi medido. Ausente em fichas antigas: nesse caso nada é
+   * afirmado.
+   */
+  limiteUsado?: number
+  direcaoUsada?: 'max' | 'min'
+  unidadeUsada?: string
 }
 
 export interface Execucao {

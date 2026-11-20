@@ -434,12 +434,27 @@ async function lerAjustesDeFichas() {
     `/configuracoes?chave=eq.${CHAVE_AJUSTES}&select=valor,atualizado_em,atualizado_por`,
   )
   const linha = linhas?.[0]
-  if (!linha) return { ajustes: {}, atualizadoEm: null, atualizadoPor: null }
+  if (!linha) return { ajustes: {}, atualizadoEm: null, atualizadoPor: null, autor: null }
   const ajustes = linha.valor && typeof linha.valor === 'object' ? linha.valor.ajustes : null
+  /**
+   * Nome de quem publicou, resolvido aqui.
+   *
+   * O app recebe `atualizadoPor` (uuid) e mais nada: sem o nome, a tela só
+   * poderia dizer "publicado" sem dizer por quem, e num formulário de
+   * conformidade a assinatura de quem revisou o limite é parte do dado.
+   */
+  let autor = null
+  if (linha.atualizado_por) {
+    const perfil = await servico(
+      `/perfis?user_id=eq.${encodeURIComponent(linha.atualizado_por)}&select=nome`,
+    )
+    autor = perfil?.[0]?.nome ?? null
+  }
   return {
     ajustes: ajustes && typeof ajustes === 'object' && !Array.isArray(ajustes) ? ajustes : {},
     atualizadoEm: linha.atualizado_em ?? null,
     atualizadoPor: linha.atualizado_por ?? null,
+    autor,
   }
 }
 

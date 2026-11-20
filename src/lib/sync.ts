@@ -307,6 +307,7 @@ export async function baixarAjustesDeFichas(
             : {},
         atualizadoEm: dados.atualizadoEm ?? null,
         atualizadoPor: dados.atualizadoPor ?? null,
+        autor: dados.autor ?? null,
       },
     }
   } catch (e) {
@@ -346,6 +347,8 @@ export interface AjustesPublicados {
   ajustes: FichasAjustadas
   atualizadoEm: string | null
   atualizadoPor?: string | null
+  /** nome de quem publicou, resolvido pelo servidor */
+  autor?: string | null
 }
 
 /**
