@@ -255,6 +255,69 @@ export async function enviarExecucao(
       const texto = await resposta.text().catch(() => '')
       return { ok: false, erro: `HTTP ${resposta.status}${texto ? `: ${texto.slice(0, 200)}` : ''}` }
     }
+
+    const dados = (await resposta.json().catch(() => null)) as {
+      recusado?: 'fechada' | 'autoria'
+      client_id?: string
+      status?: string
+    } | null
+
+    /**
+     * Ficha já fechada no servidor: o rascunho daqui não vale mais.
+     *
+     * Acontece quando o mesmo serviço foi concluído em outro aparelho — antes o
+     * rascunho voltava a subir e reabria a ficha concluída. Agora o rascunho
+     * obsoleto para de tentar. Se ele não tem medição digitada, sai daqui
+     * (lixo); se tem, fica marcado como encerrado em outro aparelho, porque
+     * apagar medição de alguém não é decisão que o app tome sozinho.
+     */
+    if (dados?.recusado === 'fechada') {
+      const local = await db.execucoes.get(execucaoId)
+      const semMedicao = !local || local.valores.every((v) => !String(v.valor ?? '').trim())
+      if (semMedicao) {
+        await db.execucoes.delete(execucaoId)
+      } else {
+        await db.execucoes.update(execucaoId, {
+          sincronizada: true,
+          encerradaRemoto: true,
+          atualizadaEm: new Date().toISOString(),
+        })
+      }
+      return { ok: true }
+    }
+
+    if (dados?.recusado === 'autoria') {
+      await db.execucoes.update(execucaoId, { sincronizada: true })
+      return { ok: false, erro: 'ficha de outra pessoa: peça ao administrador corrigir' }
+    }
+
+    /**
+     * Adota o id canônico do servidor.
+     *
+     * Dois aparelhos abrindo a mesma ficha geram ids diferentes; o servidor
+     * escolhe um e devolve aqui. Sem adotar, o aparelho reenviava para sempre e
+     * o histórico mostrava a mesma ficha duas vezes.
+     */
+    const canonico = dados?.client_id
+    if (canonico && canonico !== execucaoId) {
+      const local = await db.execucoes.get(execucaoId)
+      if (local) {
+        const jaExiste = await db.execucoes.get(canonico)
+        const localMaisNovo =
+          !jaExiste || Date.parse(local.atualizadaEm) >= Date.parse(jaExiste.atualizadaEm)
+        if (localMaisNovo) {
+          await db.execucoes.put({
+            ...local,
+            id: canonico,
+            sincronizada: true,
+            atualizadaEm: new Date().toISOString(),
+          })
+        }
+        await db.execucoes.delete(execucaoId)
+      }
+      return { ok: true }
+    }
+
     await db.execucoes.update(execucaoId, {
       sincronizada: true,
       atualizadaEm: new Date().toISOString(),

@@ -165,6 +165,15 @@ export interface Execucao {
    * em vermelho até alguém tratar o desvio.
    */
   status: 'rascunho' | 'concluida' | 'pendente'
+  /**
+   * Esta ficha foi fechada em outro aparelho.
+   *
+   * O servidor identifica a ficha pelo código (EQUIPAMENTO · data), então o
+   * mesmo serviço pode ser concluído no aparelho do administrador enquanto
+   * aqui ainda existe um rascunho. Nesse caso o rascunho para de subir e fica
+   * marcado — não é apagado, porque pode ter medição digitada por alguém.
+   */
+  encerradaRemoto?: boolean
   /** pessoa que criou a execução — só ela usa a janela de correção de 24 h */
   criadaPor?: string
   sincronizada: boolean

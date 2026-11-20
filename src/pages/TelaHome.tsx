@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { AlertTriangle, Check, ChevronRight, Clock, CloudOff, KeyRound, LogIn, LogOut, NotebookPen, Database, HardDriveDownload, Menu, Moon, Search, ShieldCheck, Sun, Trash2, User as UserIcon, Users, Wifi, X } from 'lucide-react'
 import { db } from '../lib/db'
-import { validadeDoRascunho } from '../lib/permissoes'
+import { podeApagarRascunho, validadeDoRascunho } from '../lib/permissoes'
 import { GRUPOS, grupoDaFicha } from '../config/fichas'
 import { lerEquipamentos, normalizar, type Equipamento } from '../lib/cadastros'
 import type { Sessao } from '../lib/sessao'
@@ -663,6 +663,11 @@ export default function TelaHome({
                           <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-800">
                             RASCUNHO
                           </span>
+                          {exec.encerradaRemoto && (
+                            <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[9px] font-bold text-slate-700">
+                              CONCLUÍDA EM OUTRO APARELHO
+                            </span>
+                          )}
                           <span className="flex items-center py-0.5 text-[11px] text-slate-600">
                             {quando}
                           </span>
@@ -682,7 +687,7 @@ export default function TelaHome({
                         </span>
                       </span>
                     </button>
-                    {ehAdministrador && (
+                    {podeApagarRascunho(exec, sessao) && (
                       <button
                         onClick={() =>
                           setRascunhoApagando({ id: exec.id, nome: nome || exec.codigo })

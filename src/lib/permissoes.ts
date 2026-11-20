@@ -91,6 +91,35 @@ export function validadeDoRascunho(execucao: ExecucaoMinima, agora: number = Dat
 }
 
 /**
+ * Quem pode apagar um rascunho.
+ *
+ * A exclusão do rascunho era só do administrador, e isso deixava o técnico
+ * preso: ele abria a ficha errada, ou desistia do serviço, e o rascunho ficava
+ * na home dele por cinco dias até expirar — sem nenhuma forma de limpar o que
+ * era dele. Rascunho é trabalho em andamento de quem está com o aparelho na
+ * mão; se a regra de edição já é essa, a de apagar tem que ser a mesma.
+ *
+ * Três limites, para não virar porta aberta:
+ *  - precisa de sessão (sem login, ninguém apaga nada);
+ *  - administrador apaga qualquer um;
+ *  - usuário só apaga rascunho, e só o dele — rascunho sem autor é ficha aberta
+ *    antes do login neste aparelho, então também é dele.
+ *
+ * Ficha fechada (concluída/pendente) nunca entra aqui: essa é registro do
+ * serviço e a exclusão passa pelo histórico, com o servidor sabendo.
+ */
+export function podeApagarRascunho(
+  execucao: { status: 'rascunho' | 'concluida' | 'pendente'; criadaPor?: string },
+  sessao: { pessoaId: string; nivel: 'administrador' | 'usuario' } | null,
+): boolean {
+  if (!sessao) return false
+  if (sessao.nivel === 'administrador') return true
+  if (execucao.status !== 'rascunho') return false
+  if (!execucao.criadaPor) return true
+  return execucao.criadaPor === sessao.pessoaId
+}
+
+/**
  * Identificação completa: pode sair da tela de identificação para as medições.
  *
  * A ficha é preenchida em dupla e todo registro precisa dizer QUEM mediu, ONDE

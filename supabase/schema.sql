@@ -280,3 +280,14 @@ create table if not exists public.configuracoes (
 );
 
 alter table public.configuracoes enable row level security;
+
+-- ---------------------------------------------------------------------------
+-- IDENTIDADE DA FICHA É O CÓDIGO
+--
+-- `codigo` é "EQUIPAMENTO · data" — o que está escrito na ficha de papel. O
+-- `client_id` nasce aleatório em cada aparelho, então o mesmo serviço feito em
+-- dois aparelhos virava duas linhas e as duas conclusões brigavam. O servidor
+-- passou a usar o código como chave (adotando o client_id do primeiro aparelho
+-- que subiu); este índice é a garantia no banco, não só na aplicação.
+-- ---------------------------------------------------------------------------
+create unique index if not exists execucoes_codigo_unico on public.execucoes (upper(codigo));

@@ -220,19 +220,50 @@ async function gravarExecucao(quem, p) {
   if (!p?.client_id) throw new ErroHttp(400, 'execução sem client_id')
   if (!p?.codigo) throw new ErroHttp(400, 'execução sem código')
 
-  const existentes = await servico(
-    `/execucoes?client_id=eq.${encodeURIComponent(p.client_id)}&select=id,status,criada_por`,
-  )
-  const existente = existentes?.[0]
+  /**
+   * A identidade da ficha é o CÓDIGO, não o id do aparelho.
+   *
+   * Cada aparelho gera um `client_id` aleatório ao abrir a ficha, então o mesmo
+   * trabalho feito em dois aparelhos virava duas linhas: o administrador
+   * concluía a dele, o técnico continuava com um rascunho da mesma ficha, e o
+   * app mostrava as duas coisas como se fossem serviços diferentes.
+   *
+   * `codigo` é "EQUIPAMENTO · data" — é o que está escrito na ficha de papel e
+   * o que o técnico usa para falar dela. A partir daqui ela é a chave: o
+   * primeiro aparelho que sobe define o `client_id` canônico e os demais o
+   * adotam, em vez de criar linha nova.
+   */
+  const codigo = String(p.codigo).trim()
+  const [porCodigo, porClientId] = await Promise.all([
+    servico(
+      `/execucoes?codigo=eq.${encodeURIComponent(codigo)}&select=id,client_id,status,criada_por&order=criada_em.asc&limit=1`,
+    ),
+    servico(
+      `/execucoes?client_id=eq.${encodeURIComponent(p.client_id)}&select=id,client_id,status,criada_por&limit=1`,
+    ),
+  ])
+  const existente = porCodigo?.[0] ?? porClientId?.[0]
+  /** id com que o servidor conhece esta ficha; o aparelho passa a usá-lo */
+  const canonico = existente?.client_id ?? p.client_id
 
   if (existente) {
     const fechada = existente.status === 'concluida' || existente.status === 'pendente'
-    const deOutro = existente.criada_por !== quem.id
-    if (fechada && quem.nivel !== 'administrador') {
-      return { criado: false, recusado: 'fechada' }
+    const entrandoFechada = p.status === 'concluida' || p.status === 'pendente'
+    const doMesmoAutor = existente.criada_por === quem.id
+    const administrador = quem.nivel === 'administrador'
+
+    /**
+     * Ficha concluída não volta a ser rascunho.
+     *
+     * Sem esta trava, o rascunho esquecido de outro aparelho reabria a ficha que
+     * já tinha sido fechada — e a conclusão, que é o dado que vale, sumia.
+     */
+    if (fechada && !entrandoFechada) {
+      return { criado: false, recusado: 'fechada', client_id: canonico, status: existente.status }
     }
-    if (deOutro && quem.nivel !== 'administrador') {
-      return { criado: false, recusado: 'autoria' }
+    // Rascunho de uma pessoa não é sobrescrito por outra; administrador corrige.
+    if (!doMesmoAutor && !administrador) {
+      return { criado: false, recusado: 'autoria', client_id: canonico, status: existente.status }
     }
   }
 
@@ -243,8 +274,8 @@ async function gravarExecucao(quem, p) {
    * Cada campo aceita as duas formas.
    */
   const linha = {
-    client_id: p.client_id ?? p.id,
-    codigo: p.codigo,
+    client_id: canonico,
+    codigo,
     ficha_id: p.ficha_id ?? p.fichaId,
     equipamento_id: p.equipamento_id || p.equipamentoId || null,
     equipamento: p.equipamento ?? '',
@@ -287,7 +318,7 @@ async function gravarExecucao(quem, p) {
     }).catch((e) => console.warn(`núcleo não atualizado: ${e.message}`))
   }
 
-  return { criado: !existente, atualizado: Boolean(existente) }
+  return { criado: !existente, atualizado: Boolean(existente), client_id: canonico, status: linha.status }
 }
 
 async function excluirExecucao(id) {
