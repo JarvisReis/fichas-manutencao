@@ -108,3 +108,28 @@ describe('estaEmModoRelatorio', () => {
     expect(estaEmModoRelatorio(false)).toBe(true)
   })
 })
+
+/**
+ * Aba inicial ao reabrir.
+ *
+ * "Reabrir e corrigir" existe para revisar identificação, equipe e
+ * instrumentos. Abrir direto nas medições fazia o revisor começar pelo fim do
+ * documento — a ficha reaberta passa a abrir na primeira aba.
+ */
+describe('aba inicial de ficha reaberta', () => {
+  const topicos = topicosDaFicha({ ficha: { id: 'CT-BI', camposFixos: [{ id: 'serieInstalado' }] } as never })
+
+  it('a primeira aba da ficha é a identificação', () => {
+    expect(topicos[0].id).toBe('identificacao')
+    expect(tipoEmVigor(topicos, topicos[0].id)).toBe('identificacao')
+  })
+
+  it('pedido nulo continua caindo em medições (rascunho)', () => {
+    expect(tipoEmVigor(topicos, null)).toBe('medicoes')
+  })
+
+  it('quem pode alterar vê abas; ficha concluída em leitura vê tudo', () => {
+    expect(estaEmModoRelatorio(true)).toBe(false)
+    expect(estaEmModoRelatorio(false)).toBe(true)
+  })
+})

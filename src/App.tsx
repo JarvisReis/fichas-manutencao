@@ -32,7 +32,13 @@ import { topicosDaFicha, type Topico } from './lib/topicosFicha'
 type Rota =
   | { nome: 'home' }
   | { nome: 'identificacao'; ficha: DefinicaoFicha; execucao: Execucao }
-  | { nome: 'execucao'; ficha: DefinicaoFicha; execucao: Execucao }
+  | {
+      nome: 'execucao'
+      ficha: DefinicaoFicha
+      execucao: Execucao
+      /** ficha reaberta começa pela primeira aba, não pelas medições */
+      topicoInicial?: Topico
+    }
   | { nome: 'historico' }
   | { nome: 'backup' }
   | { nome: 'manual' }
@@ -490,7 +496,21 @@ export default function App() {
       setRota({ nome: 'identificacao', ficha, execucao })
       return
     }
-    setRota({ nome: 'execucao', ficha, execucao })
+    /**
+     * Ficha fechada abre na primeira aba.
+     *
+     * "Reabrir e corrigir" existe para revisar identificação, equipe e
+     * instrumentos — abrir direto nas medições fazia o revisor começar pelo
+     * fim do documento. Rascunho continua abrindo nas medições, que é onde o
+     * técnico parou.
+     */
+    const reaberta = execucao.status !== 'rascunho'
+    setRota({
+      nome: 'execucao',
+      ficha,
+      execucao,
+      ...(reaberta ? { topicoInicial: 'identificacao' as const } : {}),
+    })
   }
 
   /** Equipamento cadastrado correspondente ao nome gravado na execução. */
@@ -680,6 +700,7 @@ export default function App() {
         <TelaExecucao
           ficha={rota.ficha}
           execucao={rota.execucao}
+          topicoInicial={rota.topicoInicial}
           podeAlterar={podeEditarExecucao(rota.execucao, sessao, rota.execucao.criadaPor).pode}
           onVoltar={() => {
             // Voltar das medições cai na identificação, não na última aba usada.
