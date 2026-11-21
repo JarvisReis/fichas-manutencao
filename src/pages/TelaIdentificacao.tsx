@@ -452,12 +452,23 @@ export default function TelaIdentificacao({
       nucleoInstalado,
       dataHora: inicio.toISOString(),
       dataFim: dias > 1 ? fim.toISOString() : undefined,
-      codigo: gerarCodigo(
-        equipamentoNome,
-        inicio,
-        undefined,
-        dias > 1 ? fim.toISOString() : undefined,
-      ),
+      /**
+       * O código é a identidade da ficha no servidor — não se recalcula.
+       *
+       * Numa ficha já existente (reaberta para corrigir) recalcular podia
+       * trocar "CLI-CT01 · 20/11/2026 14:32" pelo código base, colidindo com
+       * outra ficha do mesmo dia (o banco tem índice único em código) ou
+       * fazendo o servidor tratá-la como outra execução. Só ficha nova ganha
+       * código novo.
+       */
+      codigo:
+        execucao.codigo ||
+        gerarCodigo(
+          equipamentoNome,
+          inicio,
+          undefined,
+          dias > 1 ? fim.toISOString() : undefined,
+        ),
     })
     onContinuar()
   }

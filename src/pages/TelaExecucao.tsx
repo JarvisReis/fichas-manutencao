@@ -35,8 +35,6 @@ interface Props {
   onNovaManutencao?: () => void
   /** sem pessoa identificada: o app só visualiza, não grava */
   semIdentificacao?: boolean
-  /** Aba que abre primeiro. Ausente = padrão da ficha (medições). */
-  topicoInicial?: Topico
   /**
    * Abre o editor da ficha (parâmetros: nome, limites, pontos de medição).
    * Só administrador recebe isto — o técnico não muda o que vai medir.
@@ -82,7 +80,6 @@ export default function TelaExecucao({
   onAtualizar,
   onNovaManutencao,
   semIdentificacao = false,
-  topicoInicial,
 }: Props) {
   const [valores, setValores] = useState<ValorItem[]>(execucao.valores)
   const [obsGeral, setObsGeral] = useState(execucao.observacaoGeral ?? '')
@@ -191,15 +188,7 @@ export default function TelaExecucao({
    * a baixo, como o papel assinado, e nada nela se altera.
    */
   const topicos = topicosDaFicha({ ficha })
-  /**
-   * Aba em que a ficha abre.
-   *
-   * Rascunho abre nas medições (é onde o técnico parou). Ficha já concluída
-   * reaberta para corrigir abre na PRIMEIRA aba: quem reabre vai revisar
-   * identificação, equipe e instrumentos — cair direto nas medições fazia o
-   * revisor começar pelo fim.
-   */
-  const [topico, setTopico] = useState<Topico | null>(topicoInicial ?? null)
+    const [topico, setTopico] = useState<Topico | null>(null)
   const topicoAtivo = tipoEmVigor(topicos, topico)
   const modoRelatorio = estaEmModoRelatorio(podeAlterar)
 
