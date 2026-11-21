@@ -10,6 +10,7 @@ import {
 } from '../lib/db'
 import { lerNucleoDoServidor } from '../lib/sync'
 import { identificacaoCompleta, nucleosEmBranco } from '../lib/permissoes'
+import { fichaTemNucleo } from '../lib/topicosFicha'
 import {
   lerEquipamentos,
   lerPessoas,
@@ -162,6 +163,8 @@ export default function TelaIdentificacao({
   //    Sem ficha anterior não há o que retirar: o campo fica vazio, e isso é a
   //    exceção prevista — não erro.
   useEffect(() => {
+    // Ficha sem núcleo (seccionadora) não busca nem grava série de núcleo.
+    if (!fichaTemNucleo(ficha)) return
     const equipamento = (execucao.camposFixos.equipamento ?? '').trim()
     if (!equipamento || execucao.nucleoInstalado) return
     let cancelado = false
@@ -371,7 +374,13 @@ export default function TelaIdentificacao({
     // Núcleos: instalado sempre obrigatório; retirado só na P2 e só quando
     // existe manutenção anterior de onde ele venha.
     lista.push(
-      ...nucleosEmBranco(ehP2, nucleoInstalado, nucleoRetirado, nucleoAnteriorConhecido),
+      ...nucleosEmBranco({
+        temNucleo: fichaTemNucleo(ficha),
+        ehP2,
+        instalado: nucleoInstalado,
+        retirado: nucleoRetirado,
+        exigirRetirado: nucleoAnteriorConhecido,
+      }),
     )
     if (!local.trim()) lista.push('Local')
     if (equipe.length === 0) lista.push('Equipe')

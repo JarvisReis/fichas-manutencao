@@ -129,17 +129,31 @@ export function podeApagarRascunho(
  * núcleo retirado" com o campo preenchido na frente dele, sem deixar avançar
  * para as medições.
  *
- * Regra: núcleo instalado é sempre obrigatório; retirado só na P2, onde ele é o
- * registro da peça que saiu do contator — e só quando existe manutenção
- * anterior de onde ele venha. Contator na primeira P2 não tem o que retirar, e
- * exigir a série ali travaria a ficha por um dado que não existe.
+ * Regra: ficha sem núcleo (seccionadora) não pede nada disso; com núcleo
+ * (contator) o instalado é sempre obrigatório e o retirado só na P2 — e só
+ * quando existe manutenção anterior de onde ele venha.
+ *
+ * Antes o app exigia núcleo instalado em qualquer ficha, então a seccionadora
+ * travava pedindo "Nº Série do Núcleo" num equipamento que não tem núcleo.
  */
-export function nucleosEmBranco(
-  ehP2: boolean,
-  instalado: string | undefined,
-  retirado: string | undefined,
+export interface ContextoNucleos {
+  /** a ficha tem campo de núcleo? seccionadora não tem */
+  temNucleo: boolean
+  ehP2: boolean
+  instalado?: string
+  retirado?: string
+  /** há manutenção anterior de onde venha o núcleo retirado */
+  exigirRetirado?: boolean
+}
+
+export function nucleosEmBranco({
+  temNucleo,
+  ehP2,
+  instalado,
+  retirado,
   exigirRetirado = true,
-): string[] {
+}: ContextoNucleos): string[] {
+  if (!temNucleo) return []
   const faltando: string[] = []
   if (!(instalado ?? '').trim()) faltando.push('Nº Série do Núcleo — Instalado')
   if (ehP2 && exigirRetirado && !(retirado ?? '').trim()) {

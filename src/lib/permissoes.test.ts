@@ -97,20 +97,20 @@ describe('podeApagarRascunho', () => {
  */
 describe('nucleosEmBranco', () => {
   it('P2 com os dois núcleos preenchidos não tem pendência', () => {
-    expect(nucleosEmBranco(true, 'HPB007', 'HPB003')).toEqual([])
+    expect(nucleosEmBranco({ temNucleo: true, ehP2: true, instalado: 'HPB007', retirado: 'HPB003' })).toEqual([])
   })
 
   it('P2 sem o retirado acusa só o retirado', () => {
-    expect(nucleosEmBranco(true, 'HPB007', '')).toEqual(['Nº Série do Núcleo — Retirado'])
+    expect(nucleosEmBranco({ temNucleo: true, ehP2: true, instalado: 'HPB007', retirado: '' })).toEqual(['Nº Série do Núcleo — Retirado'])
   })
 
   it('P1 ignora o retirado, mesmo vazio', () => {
-    expect(nucleosEmBranco(false, 'HPB007', '')).toEqual([])
+    expect(nucleosEmBranco({ temNucleo: true, ehP2: false, instalado: 'HPB007', retirado: '' })).toEqual([])
   })
 
   it('instalado é sempre obrigatório', () => {
-    expect(nucleosEmBranco(false, '  ', 'HPB003')).toEqual(['Nº Série do Núcleo — Instalado'])
-    expect(nucleosEmBranco(true, '', '')).toEqual([
+    expect(nucleosEmBranco({ temNucleo: true, ehP2: false, instalado: '  ', retirado: 'HPB003' })).toEqual(['Nº Série do Núcleo — Instalado'])
+    expect(nucleosEmBranco({ temNucleo: true, ehP2: true, instalado: '', retirado: '' })).toEqual([
       'Nº Série do Núcleo — Instalado',
       'Nº Série do Núcleo — Retirado',
     ])
@@ -121,14 +121,23 @@ describe('nucleosEmBranco na P2 sem manutenção anterior', () => {
   it('contator na primeira P2 não é obrigado a ter núcleo retirado', () => {
     // Não há ficha anterior: o campo vem vazio de propósito, e exigir travaria
     // a ficha por um dado que não existe.
-    expect(nucleosEmBranco(true, 'HPB007', '', false)).toEqual([])
+    expect(nucleosEmBranco({ temNucleo: true, ehP2: true, instalado: 'HPB007', retirado: '', exigirRetirado: false })).toEqual([])
   })
 
   it('havendo manutenção anterior, o retirado volta a ser obrigatório', () => {
-    expect(nucleosEmBranco(true, 'HPB007', '', true)).toEqual(['Nº Série do Núcleo — Retirado'])
+    expect(nucleosEmBranco({ temNucleo: true, ehP2: true, instalado: 'HPB007', retirado: '', exigirRetirado: true })).toEqual(['Nº Série do Núcleo — Retirado'])
   })
 
   it('o instalado continua obrigatório nos dois casos', () => {
-    expect(nucleosEmBranco(true, '', '', false)).toEqual(['Nº Série do Núcleo — Instalado'])
+    expect(nucleosEmBranco({ temNucleo: true, ehP2: true, instalado: '', retirado: '', exigirRetirado: false })).toEqual(['Nº Série do Núcleo — Instalado'])
+  })
+})
+
+describe('nucleosEmBranco em ficha sem núcleo', () => {
+  it('seccionadora não pede número de série de núcleo', () => {
+    // A seccionadora não tem núcleo: exigir aqui travava a ficha num dado que
+    // o equipamento não possui.
+    expect(nucleosEmBranco({ temNucleo: false, ehP2: false, instalado: '', retirado: '' })).toEqual([])
+    expect(nucleosEmBranco({ temNucleo: false, ehP2: true, instalado: '', retirado: '' })).toEqual([])
   })
 })
