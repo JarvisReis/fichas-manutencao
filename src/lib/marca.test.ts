@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MARCA_CONTATOR, NOME_MARCA, normalizarMarca } from '../types'
+import { MARCA_CONTATOR, NOME_MARCA, normalizarMarca, type ItemFicha } from '../types'
 import { limiteDoItem } from './conformidade'
 import { FICHAS } from '../config/fichas'
 
@@ -49,20 +49,28 @@ describe('marca única: Sechéron', () => {
     expect(normalizarMarca(null)).toBeUndefined()
   })
 
-  it('limite de Cabos X Barramentos é 15 µΩ para qualquer marca', () => {
+  it('o mesmo ponto tem um único limite, independente da marca', () => {
     // Decisão do Ricardo: limite único para todos os contatores. Antes eram
     // 30 µΩ no geral e 15 µΩ só na Sechéron — duas respostas para a mesma
     // medição. Se alguém reintroduzir limite por marca, este teste quebra.
-    const ficha = FICHAS.find((f) => f.id === 'CT-FICHA')!
-    const cabos = ficha.itens.find((i) => i.id === 'cabos-barr')!
-    expect(limiteDoItem(cabos, normalizarMarca('schneider'))).toBe(15)
-    expect(limiteDoItem(cabos, 'merlin')).toBe(15)
-    expect(limiteDoItem(cabos, undefined)).toBe(15)
+    // O item é montado aqui de propósito: a regra vale para qualquer ficha,
+    // não depende de uma ficha específica existir no catálogo.
+    const ponto: ItemFicha = {
+      id: 'cabos-barr',
+      nome: 'Cabos X Barramentos',
+      instrumento: 'Microohmímetro',
+      unidade: 'µΩ',
+      direcao: 'max',
+      limite: 15,
+    }
+    expect(limiteDoItem(ponto, normalizarMarca('schneider'))).toBe(15)
+    expect(limiteDoItem(ponto, 'merlin')).toBe(15)
+    expect(limiteDoItem(ponto, undefined)).toBe(15)
   })
 
-  it('a ficha tem 7 pontos de medição, sem Barramento 1 X Barramento 2', () => {
-    const ficha = FICHAS.find((f) => f.id === 'CT-FICHA')!
-    expect(ficha.itens).toHaveLength(7)
-    expect(ficha.itens.some((i) => i.id === 'barr1-barr2')).toBe(false)
+  it('o catálogo tem exatamente duas fichas: contator e seccionadora', () => {
+    // Decisão do Ricardo: só existem estas duas. Ficha extra no catálogo
+    // aparece no cadastro de equipamento e confunde quem está em campo.
+    expect(FICHAS.map((f) => f.id).sort()).toEqual(['CT-BI', 'SC-BI1'])
   })
 })

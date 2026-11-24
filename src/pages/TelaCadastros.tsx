@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, ClipboardList, Mail, Pencil, Plus, Trash2, Users, Wrench, X } from 'lucide-react'
-import { FICHAS, definirFichasEmVigor, getFicha } from '../config/fichas'
+import { FICHAS, definirFichasEmVigor, fichasAtivas, getFicha } from '../config/fichas'
 import EditorFichas from './EditorFichas'
 import {
   fichasEmVigor,
@@ -880,7 +880,7 @@ function EditorEquipamentos({
                   {[equip.local, equip.serie, equip.marca].filter(Boolean).join(' · ') || 'sem detalhes'}
                 </p>
                 <p className="truncate text-[10px] font-medium text-blue-700">
-                  {FICHAS.find((f) => f.id === equip.fichaId)?.nomeCurto ?? equip.fichaId}
+                  {getFicha(equip.fichaId)?.nomeCurto ?? equip.fichaId}
                 </p>
               </div>
               <button
@@ -964,7 +964,7 @@ function FormularioEquipamento({
             onChange={(e) => setFichaId(e.target.value)}
             className="w-full rounded-lg border-2 border-slate-300 bg-white px-3 py-2.5 text-base text-slate-900 outline-none focus:border-blue-600"
           >
-            {FICHAS.map((f) => (
+            {fichasAtivas().map((f) => (
               <option key={f.id} value={f.id}>
                 {f.nomeCurto}
               </option>
